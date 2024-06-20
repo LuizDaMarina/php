@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-br">
   <head>
@@ -8,46 +7,25 @@
 
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
-    <script type="text/javascript" src="//js.nicedit.com/nicEdit-latest.js"></script> 
 
-
-    <title>Cadastro de Cliente</title>
+    <title>Sim</title>
   </head>
   <body>
     <div class="container">
-    <h1>Cadastro de Cliente</h1>
+    <h1>Faça seu login</h1>
 
-    <form method="post" action="aula2.2.php">
+    <form>
   <div class="form-group">
-    <label for="exampleFormControlInput1">Nome do Cliente </label>
-    <input type="text" name="nome" class="form-control" placeholder="Nome do Cliente">
+    <label for="exampleInputEmail1">Endereço de email</label>
+    <input type="email" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Seu email">
   </div>
   <div class="form-group">
-    <label for="exampleFormControlInput1">idade</label>
-    <input type="text" name="idade" class="form-control" placeholder="idade">
+    <label for="exampleInputPassword1">Senha</label>
+    <input type="password" class="form-control" id="exampleInputPassword1" placeholder="Senha">
   </div>
-  <div class="form-group">
-    <label for="exampleFormControlSelect1">Estado</label>
-    <select name="estado" id="exampleFormControlSelect1">
-      <option value="RS">RS</option>
-      <option value="SC">SC</option>
-      <option value="PR">PR</option>
-      <option value="AL">AL</option>
-      <option value="BA">BA</option>
-    </select>
-  </div>
-
-  <div class="form-group">
-    <label for="exampleFormControlTextarea1">Mensagem</label>
-    <textarea class="form-control" name="area2" id="area2" rows="3"></textarea>
-    </div>
-
-<input name= "enviar" type="submit" value="CADASTRO DO CLIENTE" class="btn btn-primary"></input>
+  <button type="submit" class="btn btn-primary">Enviar</button>
 </form>
-  <script type="text/javascript">
-      bkLib.onDomLoaded(function() { nicEditors.allTextAreas() });
-      </script>
-
+</div>
     <!-- JavaScript (Opcional) -->
     <!-- jQuery primeiro, depois Popper.js, depois Bootstrap JS -->
     <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>

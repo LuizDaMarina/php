@@ -82,10 +82,21 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
   final TextEditingController testemunha2 = TextEditingController();
   final TextEditingController itdtestemunha2 = TextEditingController();
 
-  //Listas para armazenar os dados dos formulários múltiplos
+
+ // Listas para armazenar os dados dos formulários múltiplos Apreesão
   List<TextEditingController> data_hora = [];
   List<TextEditingController> cidade = [];
   List<int?> estadoIdSelecionado = [];
+
+// Listas para armazenar os dados dos produtos apreendidos Apreesão
+  List<TextEditingController> produto = [];
+  List<TextEditingController> qtdApreensao = [
+  ]; // Alterado de quantidade para qtdApreensao Apreesão
+  List<TextEditingController> unidade = [
+  ]; // Para armazenar "kg", "Lt", "Mt", etc.
+  List<TextEditingController> tipo = [];
+  List<TextEditingController> marca = [];
+  List<TextEditingController> obs = [];
 
 // Lista fixa de estados
   final List<Map<String, dynamic>> estados = [
@@ -118,19 +129,104 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
     {'id': 27, 'nome': 'Tocantins'},
   ];
 
-// Função para inicializar as listas conforme a quantidade necessária
+// Lista de apreensões, cada uma contendo uma lista de produtos
+  List<Map<String, dynamic>> apreensoes = [];
+
+// Inicializar listas corretamente
   void inicializarListas(int quantidade) {
-    data_hora.clear();
-    cidade.clear();
-    estadoIdSelecionado.clear();
+    apreensoes.clear();
 
     for (int i = 0; i < quantidade; i++) {
-      data_hora.add(TextEditingController(text: getCurrentDateTimeFormatted()));
-      cidade.add(TextEditingController());
-      estadoIdSelecionado.add(null);
+      apreensoes.add({
+        "data_hora_infracao": TextEditingController(text: getCurrentDateTimeFormatted()),
+        "estadoIdSelecionado_infracao": null,
+        "cidade_infracao": TextEditingController(),
+        "produtos": [
+          {
+            "produto_infracao": TextEditingController(),
+            "qtdApreensao_infracao": TextEditingController(),
+            "unidade_infracao": TextEditingController(),
+            "tipo_infracao": TextEditingController(),
+            "marca_infracao": TextEditingController(),
+            "obs_infracao": TextEditingController(),
+          }
+        ],
+      });
+    }
+  }
+  void adicionarProduto(int indexApreensao) {
+    apreensoes[indexApreensao]["produtos"].add({
+      "produto_infracao": TextEditingController(),
+      "qtdApreensao_infracao": TextEditingController(),
+      "unidade_infracao": TextEditingController(),
+      "tipo_infracao": TextEditingController(),
+      "marca_infracao": TextEditingController(),
+      "obs_infracao": TextEditingController(),
+    });
+  }
+  void removerProduto(int indexApreensao, int indexProduto) {
+    if (apreensoes[indexApreensao]["produtos"].length > 1) {
+      apreensoes[indexApreensao]["produtos"].removeAt(indexProduto);
     }
   }
 
+
+//Infração
+// Listas para armazenar os dados dos formulários múltiplos Infrações
+  List<TextEditingController> data_hora_infracao = [];
+  List<TextEditingController> cidade_infracao = [];
+  List<int?> estadoIdSelecionado_infracao = [];
+
+// Listas para armazenar os dados dos produtos apreendidos Infrações
+  List<TextEditingController> produto_infracao = [];
+  List<TextEditingController> qtdApreensao_infracao = [];
+  List<TextEditingController> unidade_infracao = [];
+  List<TextEditingController> tipo_infracao = [];
+  List<TextEditingController> marca_infracao = [];
+  List<TextEditingController> obs_infracao = [];
+
+// Lista de infrações, cada uma contendo uma lista de produtos
+  List<Map<String, dynamic>> infracoes = [];
+
+// Inicializar lista de infrações
+  void inicializarListasInfracao(int quantidade) {
+    infracoes.clear();
+    for (int i = 0; i < quantidade; i++) {
+      infracoes.add({
+        "data_hora_infracao": TextEditingController(text: getCurrentDateTimeFormatted()),
+        "estadoIdSelecionado_infracao": null,
+        "cidade_infracao": TextEditingController(),
+        "produtos_infracao": [], // Inicializa como lista vazia
+      });
+    }
+  }
+// Método para adicionar um produto na infração
+  void adicionarProdutoInfracao(int indexInfracao) {
+    setState(() {
+// Garante que a chave "produtos_infracao" existe e é uma lista
+      if (infracoes[indexInfracao]["produtos_infracao"] == null) {
+        infracoes[indexInfracao]["produtos_infracao"] = [];
+      }
+
+      infracoes[indexInfracao]["produtos_infracao"].add({
+        "produto": TextEditingController(),
+        "qtdApreensao": TextEditingController(),
+        "unidade": TextEditingController(),
+        "tipo": TextEditingController(),
+        "marca": TextEditingController(),
+        "obs": TextEditingController(),
+      });
+    });
+  }
+// Método para remover um produto da infração
+  void removerProdutoInfracao(int indexInfracao, int indexProduto) {
+    setState(() {
+      if (infracoes[indexInfracao]["produtos_infracao"] != null &&
+          infracoes[indexInfracao]["produtos_infracao"].isNotEmpty) {
+        infracoes[indexInfracao]["produtos_infracao"].removeAt(indexProduto);
+      }
+    });
+  }
   List<File?> imagens = [];
 
 
@@ -346,21 +442,95 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
     print("Assinatura 3 Base64: $assinatura3Base64");
     print("Assinatura 4 Base64: $assinatura4Base64");
 
+
+
     // Imprimindo todas as imagens em Base64
     print("Imagens Base64:");
     for (var imagem in imagensBase64) {
       print(imagem); // Aqui você pode também limitar a quantidade de prints se as imagens forem grandes.
     }
-    List<Map<String, dynamic>> listaApreensao = [];
-    for (int i = 0; i < data_hora.length; i++) {
-      listaApreensao.add({
-        "data_hora": data_hora[i].text,
-        "estadoIdSelecionado": estadoIdSelecionado[i],
-        "cidade": cidade[i].text,
-      });
+ List<Map<String, dynamic>> listaApreensao = [];
+
+      // Verifique se a lista apreensoes não está vazia
+    if (apreensoes.isEmpty) {
+      print("ERRO: A lista de apreensões está vazia!");
+    } else {
+      for (var i = 0; i < apreensoes.length; i++) {
+        var apreensao = apreensoes[i];
+
+        // Debug: Mostrando o conteúdo de cada apreensão antes da conversão
+        print("Apreensão [$i]: ${apreensao.toString()}");
+
+        if (apreensao.containsKey("produtos") && apreensao["produtos"] is List) {
+          List<Map<String, dynamic>> produtos = (apreensao["produtos"] as List)
+              .map((produto) {
+            return {
+              "produto": produto["produto"].text,
+              "qtdApreensao": produto["qtdApreensao"].text,
+              "unidade": produto["unidade"].text,
+              "tipo": produto["tipo"].text,
+              "marca": produto["marca"].text,
+              "obs": produto["obs"].text,
+            };
+          }).toList();
+
+          listaApreensao.add({
+            "data_hora": apreensao["data_hora"].text,
+            "estadoIdSelecionado": apreensao["estadoIdSelecionado"],
+            "cidade": apreensao["cidade"].text,
+            "produtos": produtos,
+          });
+        } else {
+          print("ERRO: Produtos inválidos ou ausentes na apreensão [$i]");
+        }
+      }
     }
 
-    print(jsonEncode(listaApreensao)); // Verifique se os valores estão corretos
+    // Debug: Exibir a lista final antes do envio
+    print("Lista de apreensões JSON: ${jsonEncode(listaApreensao)}");
+
+
+    List<Map<String, dynamic>> listaInfracao = [];
+
+      // Verifique se a lista de infrações não está vazia
+    if (infracoes.isEmpty) {
+      print("ERRO: A lista de infrações está vazia!");
+    } else {
+      for (var i = 0; i < infracoes.length; i++) {
+        var infracao = infracoes[i]; // Pega a infração específica
+
+        // Debug: Mostrando o conteúdo de cada infração antes da conversão
+        print("Infração [$i]: ${infracao.toString()}");
+
+        // Verifica se a infração contém produtos e se é uma lista válida
+        if (infracao.containsKey("produtos_infracao") && infracao["produtos_infracao"] is List) {
+          List<Map<String, dynamic>> produtos = (infracao["produtos_infracao"] as List)
+              .map((produto) {
+            return {
+              "produto_infracao": produto["produto_infracao"].text,
+              "qtdApreensao_infracao": produto["qtdApreensao_infracao"].text,
+              "unidade_infracao": produto["unidade_infracao"].text,
+              "tipo_infracao": produto["tipo_infracao"].text,
+              "marca_infracao": produto["marca_infracao"].text,
+              "obs_infracao": produto["obs_infracao"].text,
+            };
+          }).toList();
+
+            // Adiciona a infração formatada na lista final
+          listaInfracao.add({
+            "data_hora_infracao": infracao["data_hora_infracao"].text,
+            "estadoIdSelecionado_infracao": infracao["estadoIdSelecionado_infracao"],
+            "cidade_infracao": infracao["cidade_infracao"].text,
+            "produtos_infracao": produtos,
+          });
+        } else {
+          print("ERRO: Produtos inválidos ou ausentes na infração [$i]");
+        }
+      }
+    }
+
+      // Debug: Exibir a lista final antes do envio
+    print("Lista de infrações JSON: ${jsonEncode(listaInfracao)}");
 
     var connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult == ConnectivityResult.none) {
@@ -390,9 +560,9 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
         'lista_deficiencia': lista_deficiencia.text,
         'observacoes_gerais': observacoes_gerais.text,
         'infracao': jsonEncode(infracao),
-        'qtd_autos_infracao': qtd_autos_infracao.text,
-        'qtd_termos_aprensao': qtd_termos_aprensao.text,
-        'qtd_termos_depositario': qtd_termos_depositario.text,
+      'qtd_autos_infracao': qtd_autos_infracao.text.isNotEmpty ? qtd_autos_infracao.text.toString() : '0',
+        'qtd_termos_aprensao': qtd_termos_aprensao.text.isNotEmpty ? qtd_termos_aprensao.text.toString() : '0',
+        'qtd_termos_depositario': qtd_termos_depositario.text.isNotEmpty ? qtd_termos_depositario.text.toString() : '0',
         'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas.text,
         'prazo_deficiencias': prazo_deficiencias.text,
         'nome_fiscal_militar': nome_fiscal_militar.text,
@@ -413,6 +583,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
 
         //Termos Apreensão.
         'listaApreensao': jsonEncode(listaApreensao),
+        'listaInfracao': jsonEncode(listaInfracao),
+
       },
     );
 
@@ -1367,17 +1539,18 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
         SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-        onPressed: () {
-// Acessa o valor do TextEditingController e tenta converter para inteiro
-        int? qtdTermos = int.tryParse(qtd_termos_aprensao.text);
+       onPressed: () {
+                    int? qtdTermos = int.tryParse(qtd_termos_aprensao.text);
+                    int? qtdTermosIfracao = int.tryParse(qtd_autos_infracao.text);
 
-// Verifica se o valor é válido (não nulo) e maior que zero
-        if (qtdTermos != null && qtdTermos > 0) {
-        exibirPopupTermosApreensao(context); // Exibe o popup para preencher os campos adicionais
-        } else {
-        enviarDadosFormulario(context); // Grava diretamente no banco de dados
-        }
-        },
+                    // Verifica se o valor é válido (não nulo) e maior que zero
+                    if (qtdTermos != null && qtdTermos > 0 || qtdTermosIfracao != null && qtdTermosIfracao > 0) {
+                      exibirPopupTermosApreensao(context, qtdTermos!, qtdTermosIfracao!); // Passando qtdTermos para o popup
+                    }
+                    else {
+                      enviarDadosFormulario(context); // Grava diretamente no banco de dados
+                    }
+                  },
         style: ElevatedButton.styleFrom(
         foregroundColor: Colors.white,
         backgroundColor: Colors.green,
@@ -1803,7 +1976,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
     );
   }
   //Construindo o formulário
-  Widget buildIdentificacaoObservacoesGeraisForm() {
+ Widget buildIdentificacaoObservacoesGeraisForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1818,30 +1991,48 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
           ],
         ),
         SizedBox(height: 10),
-        Row(
-          children: [
-            Text("Se houve infração, informar:", style: TextStyle(
-              color: Color.fromRGBO(17, 48, 33, 1),
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            )),
-          ],
-        ),
-        SizedBox(height: 10),
-        buildFormFieldComMascara("Qnt de Autos de infração:", qtd_autos_infracao, numeroMask),
-        SizedBox(height: 10,),
-        buildFormFieldComMascara("Qnt de termos de apreensão:", qtd_termos_aprensao, numeroMask),
-        SizedBox(height: 10,),
-        buildFormFieldComMascara("Qnt de termos de fiel depositário:", qtd_termos_depositario, numeroMask),
-        SizedBox(height: 10,),
+        if (infracao.isNotEmpty && infracao[0] == "Sim") ...[
+          Row(
+            children: [
+              Text(
+                "Se houve infração, informar:",
+                style: TextStyle(
+                  color: Color.fromRGBO(17, 48, 33, 1),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10),
+          buildFormFieldComMascara(
+            "Qnt de Autos de infração:",
+            qtd_autos_infracao,
+            numeroMask,
+            readOnly: infracao[0] == "Não",
+          ),
+          SizedBox(height: 10),
+          buildFormFieldComMascara(
+            "Qnt de termos de apreensão:",
+            qtd_termos_aprensao,
+            numeroMask,
+            readOnly: infracao[0] == "Não",
+          ),
+          SizedBox(height: 10),
+          buildFormFieldComMascara(
+            "Qnt de termos de fiel depositário:",
+            qtd_termos_depositario,
+            numeroMask,
+            readOnly: infracao[0] == "Não",
+          ),
+          SizedBox(height: 10),
+        ],
       ],
     );
   }
-  Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
-    List<String> perguntas = [
-      "Houve infração",
-    ];
-    // Verificando se o tamanho da lista de respostas está sincronizado com o número de perguntas
+Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
+    List<String> perguntas = ["Houve infração"];
+
     if (infracao.length < perguntas.length) {
       infracao = List.generate(perguntas.length, (index) => "");
     }
@@ -1878,6 +2069,10 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                     onChanged: (value) {
                       setState(() {
                         infracao[index] = value!;
+                        // Limpa os campos quando "Sim" for selecionado
+                        qtd_autos_infracao.clear();
+                        qtd_termos_aprensao.clear();
+                        qtd_termos_depositario.clear();
                       });
                     },
                   ),
@@ -1890,6 +2085,10 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                     onChanged: (value) {
                       setState(() {
                         infracao[index] = value!;
+                        // Bloqueia e limpa os campos quando "Não" for selecionado
+                        qtd_autos_infracao.clear();
+                        qtd_termos_aprensao.clear();
+                        qtd_termos_depositario.clear();
                       });
                     },
                   ),
@@ -1902,6 +2101,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       }),
     );
   }
+
 
   Widget buildFormFieldComMascaraData(String labelText, TextEditingController controller, MaskTextInputFormatter mask) {
 // Inicializa o campo com a data atual formatada
@@ -2138,11 +2338,11 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       style: TextStyle(color: Color.fromRGBO(17, 48, 33, 1)),
     );
   }
-  Widget buildFormFieldComMascara(
-      String labelText, TextEditingController controller, MaskTextInputFormatter mask) {
+ Widget buildFormFieldComMascara(String labelText, TextEditingController controller, MaskTextInputFormatter mask, {bool readOnly = false,}) {
     return TextFormField(
       controller: controller,
       inputFormatters: [mask],
+      readOnly: readOnly, // Define se o campo pode ser editado
       decoration: InputDecoration(
         labelText: labelText,
         labelStyle: TextStyle(
@@ -2161,157 +2361,67 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       style: TextStyle(color: Color.fromRGBO(17, 48, 33, 1)),
     );
   }
-  void exibirPopupTermosApreensao(BuildContext context) {
+
+void exibirPopupTermosApreensao(BuildContext context, int qtdTermos , qtdTermosIfracao) {
+// Garante que a lista de apreensões tenha pelo menos `qtdTermos` elementos
+    while (apreensoes.length < qtdTermos) {
+      apreensoes.add({
+        "data_hora": TextEditingController(text: getCurrentDateTimeFormatted()),
+        "estadoIdSelecionado": null,
+        "cidade": TextEditingController(),
+        "produtos": [],
+      });
+    }
+
+// Garante que a lista de infrações tenha pelo menos `qtdTermosIfracao` elementos
+    while (infracoes.length < qtdTermosIfracao) {
+      infracoes.add({
+        "data_hora_infracao": TextEditingController(text: getCurrentDateTimeFormatted()),
+        "estadoIdSelecionado_infracao": null,
+        "cidade_infracao": TextEditingController(),
+        "produtos_infracao": [],
+      });
+    }
+
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setState) {
             return AlertDialog(
-              title: Text("Preencha os Termos de Apreensão"),
+              title: Text("Preencha os Termos"),
               content: Container(
                 width: double.maxFinite,
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-// Campos de Data e Hora (Múltiplos)
-                      Text(
-                        'Data e Hora:',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: data_hora.length,
-                        itemBuilder: (context, index) {
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: data_hora[index],
-                                  decoration: InputDecoration(labelText: "Data e Hora:"),
-                                ),
-                              ),
-                              IconButton(
-                                icon: Icon(Icons.remove_circle, color: Colors.red),
-                                onPressed: () {
-                                  setState(() {
-                                    if (data_hora.length > 1) {
-                                      data_hora.removeAt(index);
-                                    }
-                                  });
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            data_hora.add(TextEditingController(text: getCurrentDateTimeFormatted()));
-                          });
-                        },
-                        child: Text("Adicionar Data"),
-                      ),
-
-                      SizedBox(height: 20),
-
-// Seleção de Estado (Múltiplo)
-                      Text(
-                        'Selecione o Estado:',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: estadoIdSelecionado.length,
-                        itemBuilder: (context, index) {
-                          return DropdownButton<int>(
-                            value: estadoIdSelecionado[index],
-                            onChanged: (int? newValue) {
-                              setState(() {
-                                estadoIdSelecionado[index] = newValue;
-                              });
-                            },
-                            items: estados.map<DropdownMenuItem<int>>((estado) {
-                              return DropdownMenuItem<int>(
-                                value: estado['id'] as int, // Garante que seja um int
-                                child: Text(estado['nome']),
-                              );
-                            }).toList(),
-                          );
-                        },
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            estadoIdSelecionado.add(null);
-                          });
-                        },
-                        child: Text("Adicionar Estado"),
-                      ),
-
-                      SizedBox(height: 20),
-
-// Campo Cidade (Digitável e múltiplo)
-                      Text(
-                        'Cidade:',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: cidade.length,
-                        itemBuilder: (context, index) {
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: cidade[index],
-                                  decoration: InputDecoration(labelText: "Cidade:"),
-                                ),
-                              ),
-                              IconButton(
-                                icon: Icon(Icons.remove_circle, color: Colors.red),
-                                onPressed: () {
-                                  setState(() {
-                                    if (cidade.length > 1) {
-                                      cidade.removeAt(index);
-                                    }
-                                  });
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            cidade.add(TextEditingController());
-                          });
-                        },
-                        child: Text("Adicionar Cidade"),
-                      ),
-
-                      SizedBox(height: 20),
-
-// Botão para salvar
-                      ElevatedButton(
-                        onPressed: () async {
-                          await enviarDadosFormulario(context); // Apenas chama a função
-                        },
-                        child: Text("Salvar"),
-                      ),
+// Exibir formulários de apreensão
+                      if (apreensoes.isNotEmpty)
+                        Column(
+                          children: List.generate(qtdTermos, (index) {
+                            return construirFormularioApreensao(index, setState);
+                          }),
+                        ),
+                      Text("Termos Infração"),
+// Exibir formulários de infração
+                      if (infracoes.isNotEmpty)
+                        Column(
+                          children: List.generate(qtdTermosIfracao, (index) {
+                            return construirFormularioInfracao(index, setState);
+                          }),
+                        ),
                     ],
                   ),
                 ),
               ),
               actions: [
-                TextButton(
+                ElevatedButton(
                   onPressed: () {
-                    Navigator.of(context).pop();
+                    enviarDadosFormulario(context);
                   },
-                  child: Text("Cancelar"),
+                  child: Text("Salvar"),
                 ),
               ],
             );
@@ -2319,5 +2429,169 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
         );
       },
     );
+
   }
+ Widget construirFormularioInfracao(int index, StateSetter setState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Data e Hora:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        TextField(
+          controller: infracoes[index]["data_hora_infracao"],
+          decoration: InputDecoration(labelText: "Data e Hora"),
+        ),
+        SizedBox(height: 10),
+
+        Text('Estado:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        DropdownButton<int>(
+          value: infracoes[index]["estadoIdSelecionado_infracao"],
+          items: estados.map((estado) {
+            return DropdownMenuItem<int>(
+              value: estado['id'],
+              child: Text(estado['nome']),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              infracoes[index]["estadoIdSelecionado_infracao"] = value;
+            });
+          },
+        ),
+        SizedBox(height: 10),
+
+        Text('Cidade:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        TextField(
+          controller: infracoes[index]["cidade_infracao"],
+          decoration: InputDecoration(labelText: "Cidade"),
+        ),
+        SizedBox(height: 10),
+
+        Text('Produtos:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        ListView.builder(
+          shrinkWrap: true,
+          itemCount: (infracoes[index]["produtos_infracao"] ?? []).length,
+          itemBuilder: (context, prodIndex) {
+            return Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: infracoes[index]["produtos_infracao"][prodIndex]["produto_infracao"],
+                    decoration: InputDecoration(labelText: "Produto"),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.remove_circle, color: Colors.red),
+                  onPressed: () {
+                    setState(() {
+                      if (infracoes[index]["produtos_infracao"] != null &&
+                          infracoes[index]["produtos_infracao"].isNotEmpty) {
+                        infracoes[index]["produtos_infracao"].removeAt(prodIndex);
+                      }
+                    });
+                  },
+                ),
+              ],
+            );
+          },
+        ),
+        ElevatedButton(
+          onPressed: () {
+            setState(() {
+              infracoes[index]["produtos_infracao"] ??= [];
+              infracoes[index]["produtos_infracao"].add({
+                "produto_infracao": TextEditingController(),
+                "qtdApreensao_infracao": TextEditingController(),
+                "unidade_infracao": TextEditingController(),
+                "tipo_infracao": TextEditingController(),
+                "marca_infracao": TextEditingController(),
+                "obs_infracao": TextEditingController(),
+              });
+            });
+          },
+          child: Text("Adicionar Produto"),
+        ),
+        Divider(),
+      ],
+    );
+  }
+  Widget construirFormularioApreensao(int index, StateSetter setState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Data e Hora:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        TextField(
+          controller: apreensoes[index]["data_hora"],
+          decoration: InputDecoration(labelText: "Data e Hora"),
+        ),
+        SizedBox(height: 10),
+
+        Text('Estado:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        DropdownButton<int>(
+          value: apreensoes[index]["estadoIdSelecionado"],
+          items: estados.map((estado) {
+            return DropdownMenuItem<int>(
+              value: estado['id'],
+              child: Text(estado['nome']),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              apreensoes[index]["estadoIdSelecionado"] = value;
+            });
+          },
+        ),
+        SizedBox(height: 10),
+
+        Text('Cidade:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        TextField(
+          controller: apreensoes[index]["cidade"],
+          decoration: InputDecoration(labelText: "Cidade"),
+        ),
+        SizedBox(height: 10),
+
+        Text('Produtos:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        ListView.builder(
+          shrinkWrap: true,
+          itemCount: apreensoes[index]["produtos"].length,
+          itemBuilder: (context, prodIndex) {
+            return Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: apreensoes[index]["produtos"][prodIndex]["produto"],
+                    decoration: InputDecoration(labelText: "Produto"),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.remove_circle, color: Colors.red),
+                  onPressed: () {
+                    setState(() {
+                      apreensoes[index]["produtos"].removeAt(prodIndex);
+                    });
+                  },
+                ),
+              ],
+            );
+          },
+        ),
+        ElevatedButton(
+          onPressed: () {
+            setState(() {
+              apreensoes[index]["produtos"].add({
+                "produto": TextEditingController(),
+                "qtdApreensao": TextEditingController(),
+                "unidade": TextEditingController(),
+                "tipo": TextEditingController(),
+                "marca": TextEditingController(),
+                "obs": TextEditingController(),
+              });
+            });
+          },
+          child: Text("Adicionar Produto"),
+        ),
+        Divider(),
+      ],
+    );
+  }
+
 }

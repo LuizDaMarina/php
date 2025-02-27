@@ -1,0 +1,2085 @@
+<?php
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type");
+header('Content-Type: application/json');
+
+require_once "../Conexao/Conexao.php";
+require 'PHPMailer-master/src/PHPMailer.php';
+require 'PHPMailer-master/src/SMTP.php';
+require 'PHPMailer-master/src/Exception.php';
+require 'PDF/fpdf.php'; // Incluindo a biblioteca FPDF
+
+// Obtendo user_id e session_token do POST
+$user_id = $_POST['user_id'] ?? null;
+$session_token = $_POST['session_token'] ?? null;
+
+// Verifica se os dados foram enviados corretamente
+if (!$user_id || !$session_token) {
+    echo json_encode(["status" => "error", "message" => "Dados ausentes"]);
+    exit;
+}
+
+try {
+    $token_result = $conexao->prepare("
+        SELECT token, TIMESTAMPDIFF(SECOND, login_time, NOW()) AS session_duration 
+        FROM session_token 
+        WHERE user_id = :user_id 
+        ORDER BY login_time DESC 
+        LIMIT 1
+    ");
+    $token_result->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+    $token_result->execute();
+
+    $token_data = $token_result->fetch(PDO::FETCH_ASSOC);
+
+    if (!$token_data || $token_data['token'] !== $session_token || $token_data['session_duration'] >= 86400) {
+        echo json_encode(["status" => "error", "message" => "Token inválido ou expirado"]);
+        exit;
+    }
+
+    //Gerar Numero Randomico
+    function gerarNumeroUnico($conexao) {
+
+        do{
+            $numeroUnico = mt_rand(1000000000,9999999999);
+            $smtp = $conexao->prepare("SELECT COUNT(*) FROM comercio WHERE numero_unico = numero_unico");
+            $smtp->bindParam(':numero_unico' , $numeroUnico);
+            $smtp->execute();
+            $existe = $smtp->fetchColumn();
+        } 
+        while($existe > 0);
+            return $numeroUnico;
+        
+    
+    }
+    $numeroUnico = gerarNumeroUnico($conexao);
+
+
+function base64paraAssinaturas($base64_string, $output_file) {
+    if (!preg_match('/^data:image\/(\w+);base64,/', $base64_string, $type)) {
+        throw new Exception('Formato de Base64 inválido');
+    }
+    
+    $data = explode(',', $base64_string);
+    if (count($data) < 2) {
+        throw new Exception('Dados Base64 incompletos');
+    }
+    
+    $imageData = base64_decode($data[1]);
+    if ($imageData === false) {
+        throw new Exception('Falha ao decodificar Base64');
+    }
+    
+    if (file_put_contents($output_file, $imageData) === false) {
+        throw new Exception('Falha ao salvar a imagem');
+    }
+    
+    return $output_file;
+}
+
+function enviarResposta($status, $message, $dados = null) {
+    $response = [
+        'status' => $status,
+        'message' => $message
+    ];
+
+    // Se houver dados adicionais, adicione ao array de resposta
+    if ($dados !== null) {
+        $response['dados'] = $dados;
+    }
+
+    // Enviar a resposta JSON
+    echo json_encode($response);
+    exit;
+}
+
+function base64paraImagens($imagensBase64){
+ $savedImages = [];
+ $errors = [];
+
+ foreach ($imagensBase64 as $index => $base64String) {
+ $filename = 'uploads/imagens/imagem_' . uniqid() . '.png'; // Nome do arquivo PNG
+ $data = explode(',', $base64String); // Separar metadados do conteúdo Base64
+
+ if (count($data) === 2 && base64_decode($data[1], true)) {
+ $decodedData = base64_decode($data[1]);
+
+ // Validar se o conteúdo é uma imagem PNG
+ $image = imagecreatefromstring($decodedData);
+ if ($image !== false) {
+ // Salvar a imagem no formato PNG
+ if (imagepng($image, $filename)) {
+ $savedImages[] = $filename; // Adiciona à lista de imagens salvas
+ } else {
+ $errors[] = "Erro ao salvar a imagem $index.";
+ }
+ imagedestroy($image);
+ } else {
+ $errors[] = "Imagem $index inválida ou corrompida.";
+ }
+ } else {
+ $errors[] = "Formato inválido para a imagem $index.";
+ }
+ }
+
+ return [
+ 'success' => empty($errors),
+ 'saved_images' => $savedImages,
+ 'errors' => $errors,
+ ];
+}
+
+function gerarPDF($dados) {
+    // Instanciando a classe FPDF
+    $pdf = new FPDF();
+    $pdf->AddPage();
+    $pdf->SetFont('Arial', '', 12);
+
+    // Adicionando Título
+    $pdf->SetFont('Arial', 'B', 14);
+    $pdf->Cell(0, 10, utf8_decode('Anexo "A"'), 0, 1, 'C');
+    $pdf->Cell(0, 10, utf8_decode('Modelo de Termo de Fiscalização/Vistoria para Empresas que realizam atividade com'), 0, 1, 'C');
+    $pdf->Cell(0, 10, utf8_decode('Comércio de Armas de fogo, Munições e Insumos.'), 0, 1, 'C');
+    $pdf->Ln(10); // Espaçamento após o título
+
+    // Caminho relativo ao script
+    $logoPath = __DIR__ . '/../../logo.png'; // Volta duas pastas para localizar a imagem
+
+    // Verifica se o arquivo existe
+    if (file_exists($logoPath)) {
+        $pdf->Image($logoPath, ($pdf->GetPageWidth() - 40) / 2, $pdf->GetY(), 40); // Centraliza o logotipo
+        $pdf->Ln(50); // Espaçamento após o logotipo
+    } else {
+        $pdf->Cell(0, 10, utf8_decode('Logotipo não encontrado.'), 0, 1, 'C');
+    }
+
+    $pdf->Ln(10);
+    $pdf->Ln(10);
+
+    // Informações do Ministério da Defesa
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(0, 10, utf8_decode('Ministério da Defesa'), 0, 1, 'C');
+    $pdf->Cell(0, 10, utf8_decode('Comando Militar do Sul'), 0, 1, 'C');
+    $pdf->Cell(0, 10, utf8_decode('Comando da 3ª Região Militar'), 0, 1, 'C');
+    $pdf->Cell(0, 10, utf8_decode('Serviço de Fiscalização de Produtos Controlados'), 0, 1, 'C');
+    $pdf->Ln(10);
+
+    // Título do termo de fiscalização
+    $pdf->SetFont('Arial', 'B', 14);
+    $pdf->Cell(0, 10, utf8_decode('Modelo de Termo de Fiscalização/Vistoria para Empresas que realizam atividade com'), 0, 1, 'C');
+    $pdf->Cell(0, 10, utf8_decode('Comércio de Armas de fogo, Munições e Insumos.'), 0, 1, 'C');
+
+    // Número do termo, incluindo o número único gerado e a data
+    $pdf->SetFont('Arial', '', 12); // Fonte padrão
+
+    // Calcula o ponto de início centralizado
+    $larguraTotal = $pdf->GetPageWidth();
+    $pdf->SetX(($larguraTotal - 100) / 2); // Reduzindo a largura total ocupada
+
+    // Texto fixo "Número"
+    $pdf->Cell(15, 10, utf8_decode('Nº:'), 0, 0, 'C');
+
+    // Número único em negrito
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(30, 10, utf8_decode($dados['numeroUnico'] . ' / '), 0, 0, 'C');
+
+    // Data atual em negrito
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(25, 10, utf8_decode(date('d/m/Y')), 0, 0, 'C');
+
+    // Texto fixo "/SFPC/3GAAE"
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->Cell(30, 10, utf8_decode('/SFPC/3º GAAAe'), 0, 1, 'C');
+
+    $pdf->Ln(10); // Espaçamento após a linha
+
+    //Dados da Empresa em duas colunas
+    $campos = [
+    'Razão Social: ' => $dados['razao_social'],
+    'Nome Fantasia: '=>$dados['nome_fantasia'],
+    'Atividade Econômica Principal: '=> $dados['atividade_eco_principal'],
+    'Email: '=>$dados['email'],
+    'Data: '=>$dados['data'],
+    'TR/CR: '=>$dados['trcr'],
+    'Endereço: '=>$dados['endereco'],
+    'Telefone: '=>$dados['telefone'],
+    'Telefone Residencial: '=>$dados['telefoneResidencial'],
+    'CNPJ: '=>$dados['cnpj'],
+    'Referência: '=>$dados['ponto_referencia'],
+    'Coordenada: '=>$dados['coordenada'],
+   
+    ];
+
+    // Título "Identificado do Fiscalizado"
+    $pdf->SetFont('Arial', 'B', 14);
+    $pdf->Cell(0, 10, utf8_decode('1.Identificação do Fiscalizado'), 0, 1, 'L');
+    $pdf->Ln(5);
+
+    // Razão Social (linha inteira)
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(40, 10, utf8_decode('Razão Social:'), 1, 0, 'L');
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->MultiCell(150, 10, utf8_decode($dados['razao_social']), 1, 'L');
+    $pdf->Ln(2);
+
+    // Nome Fantasia (linha inteira)
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(40, 10, utf8_decode('Nome Fantasia:'), 1, 0, 'L');
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->MultiCell(150, 10, utf8_decode($dados['nome_fantasia']), 1, 'L');
+    $pdf->Ln(2);
+
+    // Atividade Econômica (linha inteira)
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(75, 10, utf8_decode('Atividade Econômica Principal:'), 1, 0, 'L');
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->MultiCell(115, 10, utf8_decode($dados['atividade_eco_principal']), 1, 'L');
+    $pdf->Ln(2);
+
+    // TRCR & CNPJ  (linha inteira)
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(40, 10, utf8_decode('TRCR:'), 1, 0, 'L');
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->Cell(55, 10, utf8_decode($dados['trcr']),'TBL', 0,'L');
+    
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(20, 10, utf8_decode('CNPJ:'), 1, 0, 'L');
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->Cell(75, 10, utf8_decode($dados['cnpj']),'TBR', 1,'L');
+    $pdf->Ln(2);//Espaçamento
+
+    // Endereço (linha inteira)
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(40, 10, utf8_decode('Endereço:'), 1, 0, 'L');
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->MultiCell(150, 10, utf8_decode($dados['endereco']), 1, 'L');
+    $pdf->Ln(2);
+
+    // Telefone & Email (linha inteira)
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(40, 10, utf8_decode('Telefone:'), 1, 0, 'L');
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->Cell(55, 10, utf8_decode($dados['telefone']),'TBL', 0,'L');
+    
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(20, 10, utf8_decode('Email:'), 1, 0, 'L');
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->Cell(75, 10, utf8_decode($dados['email']),'TBR', 1,'L');
+    $pdf->Ln(2);
+
+    // Data (linha inteira)
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(40, 10, utf8_decode('Data:'), 1, 0, 'L');
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->MultiCell(150, 10, utf8_decode($dados['data']), 1, 'L');
+    $pdf->Ln(2);
+
+
+    // Ponto de Referência  (linha inteira)
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(65, 10, utf8_decode('Ponto de Referência:'), 1, 0, 'L');
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->MultiCell(125, 10, utf8_decode($dados['ponto_referencia']), 1, 'L');
+    $pdf->Ln(2);
+
+    // Coordenadas  (linha inteira)
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(40, 10, utf8_decode('Coordenada:'), 1, 0, 'L');
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->MultiCell(150, 10, utf8_decode($dados['coordenada']), 1, 'L');
+    $pdf->Ln(10);
+
+    // Titulo Verificação Documental
+    $pdf->SetFont('Arial', 'B', 14);
+    $pdf->Cell(0, 10, utf8_decode('2.Verificação do Documental'), 0, 1, 'L');
+
+    // Definir título das colunas (Nº Ordem | GERAL | SIM | NÃO | NÃO SE APLICA/OBSERVAÇÕES)
+    $pdf->SetFont('Arial','B', 12);
+
+    // Cabeçalho das colunas
+    $pdf->Cell(15, 10, utf8_decode('Nº'), 1, 0, 'C');
+    $pdf->Cell(60, 10, utf8_decode('GERAL'), 1, 0, 'C');
+    $pdf->Cell(20, 10, utf8_decode('SIM'), 1, 0, 'C');
+    $pdf->Cell(20, 10, utf8_decode('NÃO'), 1, 0, 'C');
+    $pdf->Cell(35, 10, utf8_decode('NÃO SE APLICA'), 1, 0, 'C');
+    $pdf->Cell(40, 10, utf8_decode('OBSERVAÇÕES'), 1, 0, 'C');
+    $pdf->Ln(10);
+
+
+       // Exibindo as perguntas, respostas e observações
+    $perguntasFixasA = [
+        'O CR está Ativo?',
+        'As Embalagens dos produtos estão com as IIS legíveis?',
+        'Atividades desenvolvidas estão previstas no CR?(§ 2º, Art 7° do Dec nº10.030/19)',
+        'O Alvará de funcionamento está válido?',
+        'O Plano de Segurança está vigente e atualizado?(Art. 65 da Port nº56-COLOG/2017)',
+        "O Plano de Segurança é de conhecimento de todos os integrantes da empresa?",
+        "Existem mapas mensais de controle de entrada(aquisições, saida (vendas) e estoques existentes de Armas de Fogo(AF)?(Art.24 do Dec nº10.030/19)",
+        "Existem cópias das Notas Fiscais de entrada das AF adquiridas?(§ Art.24 do Dec nº10.030/19)",
+        "Existem Guias de Tráfego correspondentes as NF de entrada?(Art.81 do Dec nº10.030/19)",
+        "Existem uma relação(documentação) das vendas de AF com identificação do alienante, do adquirente e do produto?(§ Art.24 do Dec nº10.030/19, e § 3 do Art 4º da Lei nº10.826/03",
+        "Há 2ª via das Notas Fiscais das Vendas efetuadas? (§ 2º do Art 74 do Dec nº 10.030/19)",
+        "As informações referentes à arma de fogo e do proprietário são encaminhadas no prazo de 48h, conforme o previsto no Prágrafo 1º do Art. 17 do Dec 11.615/23?",
+        "É cobrado do CAC documento de indentifacação e CR no ato da compra? (§ 2º do Art. 74 do Dec nº 10.030/19)",
+        "Mantém algum controle documental como prova?(Cópia física ou digital dos documentos: indentificação com foto, autorização de aquisição, CRAF e CR) (§ 2º do Art. 74 do Dec nº 10.030/19)",
+        "Entrega a arma ao comprador somente depois da arma estar cadastrada no SIGMA e mediante a apresentação do CRAF, com a Guia de Tráfego válida expedida pelo fornecedor?",
+        "Tem Algum controle documental como prova de que emitiu a GT?",
+        "Adquiriu AF em outros comércios? Se sim, existe requerimento de autorização para a RM com despacho e comprovante de pagamento da taxa para aquisição de armas em outros comércios varejistas?",
+        "Vendeu AF para outros comércios? Se sim, as armas vendidas foram registradas no SICOFA?",
+        "O conjunto de documentos dos balanços mensais e demais controles do movimento do estoque de PCE, estão devidamente organizados e arquivados à disposição da Fiscalização Militar (últimos 5 anos)? (documentos físicos ou digitais) (§ 6º do Art. 17 do Dec nº 11.615/23)",
+        "Consta a documentação de posse lícita de AF antiga em estoque precário, particularmente as anteriores à lei 10.826/03? (§ 2º do Art. 74 do Dec nº 10.030/19)",
+        "Comércio dispõe de registro das vendas munições e insumos registradas no SICOVEM ou em outro sistema que venha a substituí-lo, conforme § 7º do Art. 83 Portaria Nr 166 - COLOG/23?",
+        "Existe cópia física ou digital das Notas Fiscais de compra de munições e insumos?",
+        "O prazo de 48 horas para a inserção dos dados no sistema (SICOVEM) é cumprido? (Parágrafo 1º do Art. 17 do Dec nº 11.615/23)",
+        "Possui a 2ª via das Notas Fiscais (físicas e digitais) de venda de munição/insumo?",
+        "Apresentou o mapa demonstrativo mensal de venda de munição, insumo de munição, partes de cartuchos de munição, contendo as informações relativas ao tipo de munição e do adquirente? (Parágrafo 1º do Art. 17 do Dez nº 11.615/23)",
+        "Os demonstrativos (mecanismos implementados), de controle próprios de entrada e saída para as munições que não constam do SICOVEM, contém todos os dados de entrada e saída? ",
+        "Na venda de munição (apresentação do documento de identificação e CRAF SIGMA/SINARM), tem algum controle documental como prova? Como são controladas as quantidades vendidas por tipo de cliente? (Militar da FFAA, PM, CAC)",
+        "Adquiriu munição em outros comércios? Se sim, possui o requerimento de autorização para a RM com despacho e comprovante de pagamento da taxa para aquisição de munição em outros comércios varejistas?",
+        "Vendeu munição a outro comércio varejista? Se sim, as munições vendidas foram lançadas no SICOVEM?",
+        "Os demonstrativos (mecanismos implementados) de controles próprios de saída de munições que foram vendidas para outro comércio varejista (para as munições que não puderem ser registradas no SICOVEM) contêm todos os dados de acordo com as normas vigentes?",
+        "Os dados de entrada e saída de munições são inseridos,respectivamente, no SICOVEM?",
+        "Tem algum controle documental como prova? (Nota fiscal, CR?)",
+        "O conjunto de documentos dos balanços mensais, dos últimos 5 anos, estão devidamente arquivados e organizados à disposição da fiscalização militar?",
+        // Adicione mais perguntas aqui
+    ];
+
+    foreach ($dados['respostaDocumental'] as $i => $resposta) {
+
+        $pergunta = $perguntasFixasA[$i] ?? 'Pergunta não definida';
+        $observacao = (isset($observacoesDocumental[$i]) && trim($observacoesDocumental[$i]) !== '') 
+        ? $observacoesDocumental[$i] 
+        : 'S/A';
+        $pdf->SetFont('Arial', '', 12);
+
+        // Calcula a altura da célula com base no texto
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 40 ? 45 : 10;
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 50 ? 55 : 10;
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 60 ? 65 : 10;
+        $alturaObservação = $pdf->GetStringWidth($observacao) > 40 ? 20 : 10;
+        $alturaLinha = max($alturaPergunta, $alturaObservação);
+
+        // Número da Ordem
+        $pdf->Cell(15, $alturaLinha, utf8_decode($i + 1), 1, 0, 'C');
+
+        // Itens a Verificar (mantém altura fixa e evita quebra de linha extra)
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+        $pdf->MultiCell(60, 5, utf8_decode($pergunta), 0, 'L'); // Sem borda
+        $pdf->Rect($x, $y, 60, $alturaLinha); // Desenha a borda manualmente
+
+        // Ajusta a posição para continuar na mesma linha
+        $pdf->SetXY($x + 60, $y);
+
+        // Respostas (SIM / NÃO / Não se aplica)
+        $pdf->Cell(20, $alturaLinha, utf8_decode($resposta == 'Sim' ? 'X' : ''), 1, 0, 'C');
+        $pdf->Cell(20, $alturaLinha, utf8_decode($resposta == 'Não' ? 'X' : ''), 1, 0, 'C');
+        $pdf->Cell(35, $alturaLinha, utf8_decode($resposta == 'Não se Aplica' ? 'X' : ''), 1, 0, 'C');
+
+        // Observações (mantém altura fixa e evita quebra de linha extra)
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+         $pdf->MultiCell(
+        40, 
+        5, 
+        utf8_decode((isset($observacoesDocumental[$i]) && trim($observacoesDocumental[$i]) !== '') 
+            ? $observacoesDocumental[$i] 
+            : 'S/A'), 
+        0, 
+        'L'
+        );
+        $pdf->Rect($x, $y, 40, $alturaLinha);
+
+        // Vai direto para a próxima linha (sem espaço extra)
+        $pdf->SetY($y + $alturaLinha);
+        }
+
+        $pdf->Cell(95, 10, utf8_decode('' ), 0, 1);
+        $pdf->Cell(95, 10, utf8_decode('' ), 0, 1);
+
+    $perguntasFixasB = [
+        "Os PCE em estoque correspondem aos números de ordem autorizados no Certificado de Registro?",
+        "As quantidades de PCE em estoque estão dentro dos limites das dotações autorizadas no CR?",
+        "A capacidade do local (cofre ou sala cofre) de armazenamento comporta a totalidade de PCE apostilada no CR?",
+        "Os quantitativos de armas de fogo em estoque correspondem aos lançamentos realizados nos mapas mensais de entrada, saidas, e nos em estoque provisório?",
+        "Os quantitativos de munições e insumos controlados pelo SICOVEM, em estoque (incluidos, SFC, os em trânsito) correspondem aos lançamentos realizados no sistema de entrada e saída de munição industrializadas- cartuchos de munição industrializados partes de cartuchos de munição espoletas e demais insumos? Estão devidamente loteados, identificados e de fácil acesso para conferência?",
+        "Os quantitativos de munições industrializadas que não constam no SICOVEM correspondem aos lançamentos realizados nos mapas mensais de entrada/saida de munição industrializadas/cartuchos de munição industrializados/partes de cartuchos munição/espoletas e demais insumos? ",
+        "As munições industrializadas e insumos de cartuchos de munições em estoque estão dentro da validade?",
+        "Todas as munições em depósito estão acondicionadas em embalagens com sistema de código de barras para fins de rastreio?",
+        "Existe alguma embalagem deslacrada e fracionada?",
+        "O depósito, sala cofre, cofre o armário, destinados para a armazenagem das AF e munições é compatível com o estoque fisico existente?",
+        "A empresa possui controle dos quantitativos de capacidade máxima de PCE do tipo Arma de Fogo e Munições conforme prevé tabela da capacidade de depósitos Nr III do Anexo B6 da Port nº 56 COLOG/2017?",
+        "Há evidências de que a empresa atende a capacidade de armazenamento dos demais PCE relacionados no requerimento? (Verificar se a empresa possui ou está em processo de apostilamento para realizar armazenamento para TERCEIROS, devendo ser descrito separadamente do armazenamento PRÓPRIO, na tabela acima referenciada)",
+        // Adicione mais perguntas aqui
+    ];
+
+    // Titulo Verificação Documental
+    $pdf->SetFont('Arial', 'B', 14);
+    $pdf->Cell(0, 10, utf8_decode('3.Verificação dos PCE'), 0, 1, 'L');
+
+    // Definir título das colunas (Nº Ordem | GERAL | SIM | NÃO | NÃO SE APLICA/OBSERVAÇÕES)
+    $pdf->SetFont('Arial','B', 12);
+
+    //Cabeçalho das colunas
+    $pdf->Cell(15, 10, utf8_decode('Nº'), 1, 0, 'C');
+    $pdf->Cell(60, 10, utf8_decode('GERAL'), 1, 0, 'C');
+    $pdf->Cell(20, 10, utf8_decode('SIM'), 1, 0, 'C');
+    $pdf->Cell(20, 10, utf8_decode('NÃO'), 1, 0, 'C');
+    $pdf->Cell(35, 10, utf8_decode('NÃO SE APLICA'), 1, 0, 'C');
+    $pdf->Cell(40, 10, utf8_decode('OBSERVAÇÕES'), 1, 0, 'C');
+    $pdf->Ln(10);
+
+    foreach ($dados['respostaPce'] as $i => $resposta) {
+    
+        $pergunta = $perguntasFixasB[$i] ?? 'Pergunta não definida';
+        $observacao = (isset($observacoesPce[$i]) && trim($observacoesPce[$i]) !== '') 
+        ? $observacoesPce[$i] 
+        : 'S/A';
+        $pdf->SetFont('Arial', '', 12);
+
+        // Calcula a altura da célula com base no texto
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 40 ? 45 : 10;
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 50 ? 55 : 10;
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 60 ? 65 : 10;
+        $alturaObservação = $pdf->GetStringWidth($observacao) > 40 ? 20 : 10;
+        $alturaLinha = max($alturaPergunta, $alturaObservação);
+
+        // Número da Ordem
+        $pdf->Cell(15, $alturaLinha, utf8_decode($i + 1), 1, 0, 'C');
+
+        // Itens a Verificar (mantém altura fixa e evita quebra de linha extra)
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+        $pdf->MultiCell(60, 5, utf8_decode($pergunta), 0, 'L'); // Sem borda
+        $pdf->Rect($x, $y, 60, $alturaLinha); // Desenha a borda manualmente
+
+        // Ajusta a posição para continuar na mesma linha
+        $pdf->SetXY($x + 60, $y);
+
+        // Respostas (SIM / NÃO / Não se aplica)
+        $pdf->Cell(20, $alturaLinha, utf8_decode($resposta == 'Sim' ? 'X' : ''), 1, 0, 'C');
+        $pdf->Cell(20, $alturaLinha, utf8_decode($resposta == 'Não' ? 'X' : ''), 1, 0, 'C');
+        $pdf->Cell(35, $alturaLinha, utf8_decode($resposta == 'Não se Aplica' ? 'X' : ''), 1, 0, 'C');
+
+        // Observações (mantém altura fixa e evita quebra de linha extra)
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+        $pdf->MultiCell(
+        40, 
+        5, 
+        utf8_decode((isset($observacoesPce[$i]) && trim($observacoesPce[$i]) !== '') 
+        ? $observacoesPce[$i] 
+        : 'S/A'), 
+        0, 
+        'L'
+        );
+        $pdf->Rect($x, $y, 40, $alturaLinha);
+
+        // Vai direto para a próxima linha (sem espaço extra)
+        $pdf->SetY($y + $alturaLinha);
+    }
+
+    $pdf->Cell(95, 10, utf8_decode('' ), 0, 1);
+    $pdf->Cell(95, 10, utf8_decode('' ), 0, 1);
+
+    $perguntasFixasC = [
+        "Há Plano de Segurança de area e dos Produtos Controlados pelo Exército (PCE) atualizados?",
+        "Os funcionários conhecem o Plano de Segurança?",
+        "As barreiras físicas, os sistemas de segurança eletrônicos (alarmes, monitoramento à distância, vigias), a restrição quanto ao acesso de pessoal ao local de armazenagem e guarda dos PCE descritos no Plano de Segurança efetivamente (há eficácia)?",
+        "Existe o serviço de vigilância armada para os casos de armazenamento de armas e munições de uso restrito feito por estabelecimentos comerciais e entidades de tiro e caça?",
+        // Adicione mais perguntas aqui
+    ];
+
+    // Titulo Verificação Documental
+    $pdf->SetFont('Arial', 'B', 14);
+    $pdf->Cell(0, 10, utf8_decode('4.Segurança de PCE'), 0, 1, 'L');
+
+    // Definir título das colunas (Nº Ordem | GERAL | SIM | NÃO | NÃO SE APLICA/OBSERVAÇÕES)
+    $pdf->SetFont('Arial','B', 12);
+
+    // Cabeçalho das colunas
+    $pdf->Cell(15, 10, utf8_decode('Nº'), 1, 0, 'C');
+    $pdf->Cell(60, 10, utf8_decode('GERAL'), 1, 0, 'C');
+    $pdf->Cell(20, 10, utf8_decode('SIM'), 1, 0, 'C');
+    $pdf->Cell(20, 10, utf8_decode('NÃO'), 1, 0, 'C');
+    $pdf->Cell(35, 10, utf8_decode('NÃO SE APLICA'), 1, 0, 'C');
+    $pdf->Cell(40, 10, utf8_decode('OBSERVAÇÕES'), 1, 0, 'C');
+    $pdf->Ln(10);
+
+    foreach ($dados['respostaSegurancaPce'] as $i => $resposta) {
+
+        $pergunta = $perguntasFixasC[$i] ?? 'Pergunta não definida';
+        $observacao = (isset($observacoesSegurancaPce[$i]) && trim($observacoesSegurancaPce[$i]) !== '') 
+        ? $observacoesSegurancaPce[$i] 
+        : 'S/A';
+        $pdf->SetFont('Arial', '', 12);
+
+        // Calcula a altura da célula com base no texto
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 40 ? 45 : 10;
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 50 ? 55 : 10;
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 60 ? 65 : 10;
+        $alturaObservação = $pdf->GetStringWidth($observacao) > 40 ? 20 : 10;
+        $alturaLinha = max($alturaPergunta, $alturaObservação);
+
+        // Número da Ordem
+        $pdf->Cell(15, $alturaLinha, utf8_decode($i + 1), 1, 0, 'C');
+
+        // Itens a Verificar (mantém altura fixa e evita quebra de linha extra)
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+        $pdf->MultiCell(60, 5, utf8_decode($pergunta), 0, 'L'); // Sem borda
+        $pdf->Rect($x, $y, 60, $alturaLinha); // Desenha a borda manualmente
+
+        // Ajusta a posição para continuar na mesma linha
+        $pdf->SetXY($x + 60, $y);
+
+        // Respostas (SIM / NÃO / Não se aplica)
+        $pdf->Cell(20, $alturaLinha, utf8_decode($resposta == 'Sim' ? 'X' : ''), 1, 0, 'C');
+        $pdf->Cell(20, $alturaLinha, utf8_decode($resposta == 'Não' ? 'X' : ''), 1, 0, 'C');
+        $pdf->Cell(35, $alturaLinha, utf8_decode($resposta == 'Não se Aplica' ? 'X' : ''), 1, 0, 'C');
+
+        // Observações (mantém altura fixa e evita quebra de linha extra)
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+        $pdf->MultiCell(
+        40, 
+        5, 
+        utf8_decode((isset($observacoesSegurancaPce[$i]) && trim($observacoesSegurancaPce[$i]) !== '') 
+        ? $observacoesSegurancaPce[$i] 
+        : 'S/A'), 
+        0, 
+        'L'
+        );
+        $pdf->Rect($x, $y, 40, $alturaLinha);
+
+        // Vai direto para a próxima linha (sem espaço extra)
+        $pdf->SetY($y + $alturaLinha);
+    }
+
+    $pdf->Cell(95, 10, utf8_decode('' ), 0, 1);
+    $pdf->Cell(95, 10, utf8_decode('' ), 0, 1);
+
+    // Placa de veiculos
+    $pdf->Ln(10);
+
+    // Titulo Verificação Documental
+    $pdf->SetFont('Arial', 'B', 14);
+    $pdf->Cell(0, 10, utf8_decode('5.Transporte PCE'), 0, 1, 'L');
+
+    // Definir título das colunas (Nº Ordem | GERAL | SIM | NÃO | NÃO SE APLICA/OBSERVAÇÕES)
+    $pdf->SetFont('Arial','B', 12);
+
+    // Cabeçalho das colunas
+    $pdf->Cell(15, 10, utf8_decode('Nº'), 1, 0, 'C');
+    $pdf->Cell(60, 10, utf8_decode('GERAL'), 1, 0, 'C');
+    $pdf->Cell(20, 10, utf8_decode('SIM'), 1, 0, 'C');
+    $pdf->Cell(20, 10, utf8_decode('NÃO'), 1, 0, 'C');
+    $pdf->Cell(35, 10, utf8_decode('NÃO SE APLICA'), 1, 0, 'C');
+    $pdf->Cell(40, 10, utf8_decode('OBSERVAÇÕES'), 1, 0, 'C');
+    $pdf->Ln(10);
+
+    $perguntasFixasD = [
+        "A empresa possui apostilada ou está em processo de apostilamento da atividade de PRESTAÇÃO DE SERVIÇO (PRÓPRIO) REFERENTE A TRANSPORTE DE ARMA DE FOGO E MUNIÇÕES?",
+        "A empresa posui apostilada ou está em processo de apostilamento da atividade de PRESTAÇÃO DE SERVIÇO-TRANSPORTE DE ARMA DE FOGO E MUNIÇÃO?",
+        // Adicione mais perguntas aqui
+    ];
+
+    foreach ($dados['respostaTransportePce'] as $i => $resposta) {
+
+        $pergunta = $perguntasFixasD[$i] ?? 'Pergunta não definida';
+        $observacao = (isset($observacoesTransportePce[$i]) && trim($observacoesTransportePce[$i]) !== '') 
+        ? $observacoesTransportePce[$i] 
+        : 'S/A';
+        $pdf->SetFont('Arial', '', 12);
+
+        // Calcula a altura da célula com base no texto
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 40 ? 45 : 10;
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 50 ? 55 : 10;
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 60 ? 65 : 10;
+        $alturaObservação = $pdf->GetStringWidth($observacao) > 40 ? 20 : 10;
+        $alturaLinha = max($alturaPergunta, $alturaObservação);
+
+        // Número da Ordem
+        $pdf->Cell(15, $alturaLinha, utf8_decode($i + 1), 1, 0, 'C');
+
+        // Itens a Verificar (mantém altura fixa e evita quebra de linha extra)
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+        $pdf->MultiCell(60, 5, utf8_decode($pergunta), 0, 'L'); // Sem borda
+        $pdf->Rect($x, $y, 60, $alturaLinha); // Desenha a borda manualmente
+
+        // Ajusta a posição para continuar na mesma linha
+        $pdf->SetXY($x + 60, $y);
+
+        // Respostas (SIM / NÃO / Não se aplica)
+        $pdf->Cell(20, $alturaLinha, utf8_decode($resposta == 'Sim' ? 'X' : ''), 1, 0, 'C');
+        $pdf->Cell(20, $alturaLinha, utf8_decode($resposta == 'Não' ? 'X' : ''), 1, 0, 'C');
+        $pdf->Cell(35, $alturaLinha, utf8_decode($resposta == 'Não se Aplica' ? 'X' : ''), 1, 0, 'C');
+
+        // Observações (mantém altura fixa e evita quebra de linha extra)
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+        $pdf->MultiCell(
+        40, 
+        5, 
+        utf8_decode((isset($observacoesTransportePce[$i]) && trim($observacoesTransportePce[$i]) !== '') 
+        ? $observacoesTransportePce[$i] 
+        : 'S/A'), 
+        0, 
+        'L'
+        );
+        $pdf->Rect($x, $y, 40, $alturaLinha);
+
+        // Vai direto para a próxima linha (sem espaço extra)
+        $pdf->SetY($y + $alturaLinha);
+    }
+
+    $pdf->Cell(95, 10, utf8_decode('' ), 0, 1);
+    $pdf->Cell(95, 10, utf8_decode('' ), 0, 1);
+
+    $pdf->SetFont('Arial','B', 12);
+    $pdf->Cell(0, 10, utf8_decode('Veículos verificados'), 0, 1, 'L');
+
+    // Cabeçalho das colunas com bordas
+    $pdf->Cell(95, 10, utf8_decode('Placa do Veículo'), 1, 0, 'C');
+    $pdf->Cell(95, 10, utf8_decode('Documentação'), 1, 1, 'C');
+
+    foreach ($dados['placaVeiculo'] as $i => $resposta) {
+        $documentacaoVeiculo = $dados['documentacaoVeiculo'][$i] ?? 'Sem observação';
+
+        // Dados das colunas com bordas
+        $pdf->SetFont('Arial', '', 12);
+        $pdf->Cell(95, 10, utf8_decode($resposta), 1, 0, 'C');
+        $pdf->Cell(95, 10, utf8_decode($documentacaoVeiculo), 1, 1, 'C');
+    }
+
+    // Espaçamento final
+    $pdf->Cell(190, 10, '', 0, 1);
+    $pdf->Ln(10);
+
+    $perguntasFixasE = [
+        "A empresa possui apostilada ou está em processo de apostilamento da atividade de MANUTENÇÃO OU REPARAÇÃO DE ARMA DE FOGO?",
+        "Documentação do armeiro cadastrado na Polícia Federal?",
+        // Adicione mais perguntas aqui
+    ];
+
+    // Titulo Verificação Documental
+    $pdf->SetFont('Arial', 'B', 14);
+    $pdf->Cell(0, 10, utf8_decode('6.Prestação de Serviço: Manutenção/Reparação Armas de Fogo'), 0, 1, 'L');
+
+    // Definir título das colunas (Nº Ordem | GERAL | SIM | NÃO | NÃO SE APLICA/OBSERVAÇÕES)
+    $pdf->SetFont('Arial','B', 12);
+
+    // Cabeçalho das colunas
+    $pdf->Cell(15, 10, utf8_decode('Nº'), 1, 0, 'C');
+    $pdf->Cell(60, 10, utf8_decode('GERAL'), 1, 0, 'C');
+    $pdf->Cell(20, 10, utf8_decode('SIM'), 1, 0, 'C');
+    $pdf->Cell(20, 10, utf8_decode('NÃO'), 1, 0, 'C');
+    $pdf->Cell(35, 10, utf8_decode('NÃO SE APLICA'), 1, 0, 'C');
+    $pdf->Cell(40, 10, utf8_decode('OBSERVAÇÕES'), 1, 0, 'C');
+    $pdf->Ln(10);
+
+    foreach ($dados['respostaManutencaoArmaFogo'] as $i => $resposta) {
+
+        $pergunta = $perguntasFixasE[$i] ?? 'Pergunta não definida';
+        $observacao = (isset($observacoesManutencaoArmaFogo[$i]) && trim($observacoesManutencaoArmaFogo[$i]) !== '') 
+        ? $observacoesManutencaoArmaFogo[$i] 
+        : 'S/A';
+        $pdf->SetFont('Arial', '', 12);
+
+        // Calcula a altura da célula com base no texto
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 40 ? 45 : 10;
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 50 ? 55 : 10;
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 60 ? 65 : 10;
+        $alturaObservação = $pdf->GetStringWidth($observacao) > 40 ? 20 : 10;
+        $alturaLinha = max($alturaPergunta, $alturaObservação);
+
+        // Número da Ordem
+        $pdf->Cell(15, $alturaLinha, utf8_decode($i + 1), 1, 0, 'C');
+
+        // Itens a Verificar (mantém altura fixa e evita quebra de linha extra)
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+        $pdf->MultiCell(60, 5, utf8_decode($pergunta), 0, 'L'); // Sem borda
+        $pdf->Rect($x, $y, 60, $alturaLinha); // Desenha a borda manualmente
+
+        // Ajusta a posição para continuar na mesma linha
+        $pdf->SetXY($x + 60, $y);
+
+        // Respostas (SIM / NÃO / Não se aplica)
+        $pdf->Cell(20, $alturaLinha, utf8_decode($resposta == 'Sim' ? 'X' : ''), 1, 0, 'C');
+        $pdf->Cell(20, $alturaLinha, utf8_decode($resposta == 'Não' ? 'X' : ''), 1, 0, 'C');
+        $pdf->Cell(35, $alturaLinha, utf8_decode($resposta == 'Não se Aplica' ? 'X' : ''), 1, 0, 'C');
+
+        // Observações (mantém altura fixa e evita quebra de linha extra)
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+        $pdf->MultiCell(
+        40, 
+        5, 
+        utf8_decode((isset($observacoesManutencaoArmaFogo[$i]) && trim($observacoesManutencaoArmaFogo[$i]) !== '') 
+        ? $observacoesManutencaoArmaFogo[$i] 
+        : 'S/A'), 
+        0, 
+        'L'
+        );
+        $pdf->Rect($x, $y, 40, $alturaLinha);
+
+        // Vai direto para a próxima linha (sem espaço extra)
+        $pdf->SetY($y + $alturaLinha);
+    }
+
+    $pdf->Cell(95, 10, utf8_decode('' ), 0, 1);
+    $pdf->Cell(95, 10, utf8_decode('' ), 0, 1);
+
+    // Titulo Informação sobre Infrações
+    $pdf->SetFont('Arial', 'B', 14);
+    $pdf->Cell(190, 10, utf8_decode('Itens 7, 8 e 9'), 0, 1, 'L');  
+    $pdf->Ln(5);
+
+    //  Definição das larguras das colunas
+    $larguraRotulo = 70; //Largura fixa para os rótulos
+    $larguraValor = 120; //Largura para os valores (permitindo quebra de linha)
+    $alturaLinha = 10; //Altura da linha base
+    $espacamento = 2; //Espaçamento entre linhas
+
+    //  Lista de campos que podem ter textos longos
+    $camposMultilinha = ['7.Lista de Deficiencias', '8.Observações Gerais', '9.Especificar Deficiências'];
+
+    //  Função para calcular a altura do Multicell
+    function getMultiCellHeight($pdf, $texto, $largura, $alturaLinha){
+        $numLinhas = $pdf->GetStringWidth($texto) / $largura;
+        $numLinhas = ceil($numLinhas); // Arredonda para cima
+        return max($alturaLinha, $numLinhas * $alturaLinha); //Retorna a altura mínima necessária
+    }
+    
+    // Informação sobre Infrações
+    $camposInfracao = [
+        '7.Lista de Deficiências: ' => $dados['lista_deficiencia'],
+        '8.Observações Gerais: ' => $dados['observacoes_gerais'],
+        'Qtd Autos de Infração: ' => $dados['qtd_autos_infracao'],
+        'Qtd Autos de Apreensão: ' => $dados['qtd_termos_aprensao'],
+        'Qtd Termos Depositário: ' => $dados['qtd_termos_depositario'],
+        '9.Especificar Deficiências: ' => $dados['especificar_deficiencias'],
+        'Prazo Deficiências: ' => $dados['prazo_deficiencias'],
+    ];
+
+        // Adicionando lista de infrações (se existirem)
+    if( !empty ($dados ['infracao'])) {
+        foreach($dados['infracao'] as $infracao) {
+            $pdf->SetFont( 'Arial', 'B', 12);
+            $pdf->MultiCell(0, $alturaLinha, utf8_decode('Há infrações? : ' . $infracao), 1, 'C');
+        }
+    }
+
+    foreach ($camposInfracao as $rotulo => $valor) {
+        $pdf->SetFont('Arial', 'B', 12);
+        
+
+        // Calcula a altura da célula baseada no conteúdo
+        if (in_array($rotulo,$camposMultilinha)) {
+        $alturaLinha =getMultiCellHeight ($pdf, $valor, $larguraValor, $alturaLinha);
+        } else {
+            $altura = $alturaLinha; //Usa altura padrão
+        }
+
+        // Cria a célula do rótulo
+        $pdf->Cell($larguraRotulo, $altura, utf8_decode($rotulo . ':'), 1, 0, 'L');
+
+        // Cria a célula do valor com MultiCell
+        $pdf->SetFont('Arial', '', 12);
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+        $pdf->MultiCell($larguraValor, $alturaLinha, utf8_decode($valor), 1, 'L');
+
+        // Ajusta a posição para a próxima linha
+        $pdf->SetXY($x + $larguraValor, $y + $altura);
+        $pdf->Ln($espacamento);
+    }
+
+    // Espaçamento antes das infrações
+    $pdf->Ln(5);
+    $pdf->Cell(0, 10, utf8_decode('Da comprovação do cumprimento:'), 0, 1, 'U');
+    $pdf->MultiCell(190, 10, utf8_decode('É de responsabilidade do fiscalizado fornecer documentos, fotos, relatórios, termos e deamis subsídios de forma a comprovar o cumprimento das pendências apontadas no item 7. LISTA DE DEFICIÊNCIAS ENCONTRADAS, apresentando-as junto ao SFPC/RM, O não cumprimento das pendências e/ou a não informação deste á fiscalização de produtos controlados dentro do prazo estiplado neste item implicará na instauração de Processo Administrativo Sancionador.'), 1, 'L');  
+
+    
+    $pdf->Ln(10); // 1ª quebra
+    $pdf->Ln(10); // 2ª quebra
+    $pdf->Ln(10); // 3ª quebra
+
+    // Adicionando título e imagens
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(0, 10, utf8_decode('Imagens:'), 0, 1, 'C');
+    $pdf->Ln(5); // Espaçamento após o título
+
+    // Adicionando imagens
+    if (!empty($_POST['imagens'])) {
+        $imagensBase64 = json_decode($_POST['imagens'], true);
+        if (is_array($imagensBase64)) {
+            $resultadoImagens = base64paraImagens($imagensBase64);
+            if (!empty($resultadoImagens['saved_images'])) {
+                $xPosition = 10;
+                $yPosition = $pdf->GetY(); // Pega a posição Y atual após o título
+                $maxWidth = 190; // Largura máxima disponível por linha
+                $maxImagesPerRow = 5; // Máximo de imagens por linha
+                $imageWidth = ($maxWidth - ($maxImagesPerRow - 1) * 5) / $maxImagesPerRow; // Calculando a largura das imagens para se ajustarem
+
+                foreach ($resultadoImagens['saved_images'] as $index => $imagem) {
+                    if (file_exists($imagem)) {
+                        $imageInfo = getimagesize($imagem);
+                        if ($imageInfo !== false && $imageInfo[2] === IMAGETYPE_PNG) {
+                            try {
+                                // Ajustar a altura automaticamente para manter a proporção
+                                $aspectRatio = $imageInfo[0] / $imageInfo[1]; // Largura / Altura da imagem original
+                                $imageHeight = $imageWidth / $aspectRatio; // Calcula a altura proporcional
+
+                                // Adicionar a imagem no PDF
+                                $pdf->Image($imagem, $xPosition, $yPosition, $imageWidth, $imageHeight);
+
+                                // Atualizar a posição para a próxima imagem
+                                $xPosition += $imageWidth + 5; // 5 de espaçamento entre as imagens
+
+                                // Quando atinge o limite de 5 imagens, começa uma nova linha
+                                if (($index + 1) % $maxImagesPerRow === 0) {
+                                    $xPosition = 10; // Reinicia a posição horizontal
+                                    $yPosition += $imageHeight + 5; // Move para a próxima linha com base na altura da imagem
+                                }
+
+                                // Verificar se há espaço suficiente para as assinaturas, caso contrário, adicionar uma nova página
+                                if ($yPosition + 50 > $pdf->getPageHeight()) {
+                                    $pdf->AddPage(); // Adiciona uma nova página se o espaço for insuficiente
+                                    $yPosition = 10; // Reseta a posição Y para o topo
+                                }
+                            } catch (Exception $e) {
+                                $pdf->MultiCell(0, 10, "Erro ao inserir a imagem: " . $e->getMessage());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    $pdf->Ln(10); // 1ª quebra
+    $pdf->Ln(10); // 2ª quebra
+    $pdf->Ln(10); // 3ª quebra
+
+    $pdf->Ln(10); // 1ª quebra
+    $pdf->Ln(10); // 2ª quebra
+    $pdf->Ln(10); // 3ª quebra
+
+    // Garantindo espaço suficiente para as assinaturas
+    $pdf->Ln(10); // Deixe um espaçamento extra após as imagens antes das assinaturas
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(0, 10, utf8_decode('Assinaturas:'), 1, 1, 'C');
+    $pdf->Ln(5); // Pequeno espaçamento
+
+    // Continue com as assinaturas
+    $larguraTitulo = 60;
+    $larguraAssinatura = 90;
+    $alturaLinha = 10;
+    $alturaAssinatura = 40;
+    $alturaTexto = 8;
+    $alturaTotalAssinatura = $alturaAssinatura + (count($assinaturas[0]['campos_extras']) + 1) * $alturaTexto + 10; // Altura total estimada
+
+    // Dados das assinaturas
+    $assinaturas = [
+        [
+            "titulo" => "Fiscal Militar",
+            "nome" => $dados['nome_fiscal_militar'],
+            "campos_extras" => [
+                "P/G" => $dados['fiscal_pg'],
+                "IDT" => $dados['idtmilitar'],
+                "OM" => $dados['ommilitar']
+            ]
+        ],
+        [
+            "titulo" => "Responsável Empresa",
+            "nome" => $dados['nome_empresa'],
+            "campos_extras" => [
+                "CPF" => $dados['cpf_empresa']
+            ]
+        ],
+        [
+            "titulo" => "Testemunha 1",
+            "nome" => $dados['testemunha1'],
+            "campos_extras" => [
+                "IDT" => $dados['itdtestemunha1']
+            ]
+        ],
+        [
+            "titulo" => "Testemunha 2",
+            "nome" => $dados['testemunha2'],
+            "campos_extras" => [
+                "IDT" => $dados['itdtestemunha2']
+            ]
+        ]
+    ];
+
+    // Processando assinaturas
+    foreach ($assinaturas as $i => $assinatura) {
+        $campoAssinatura = 'assinatura' . ($i + 1);
+
+        if (isset($dados[$campoAssinatura]) && !empty($dados[$campoAssinatura])) {
+            try {
+                $assinaturaImg = base64paraAssinaturas($dados[$campoAssinatura], 'PDF/FormulariosPDF/' . $campoAssinatura . '.png');
+
+                // **Verifica se há espaço suficiente na página antes de adicionar a assinatura**
+                if ($pdf->GetY() + $alturaTotalAssinatura > $pdf->GetPageHeight() - 20) {
+                    $pdf->AddPage();
+                    $pdf->Ln(10); // Pequeno espaçamento no topo da nova página
+                }
+
+                // Linha do título
+                $pdf->SetFont('Arial', 'B', 12);
+                $pdf->Cell(0, $alturaLinha, utf8_decode($assinatura['titulo']), 1, 1, 'C');
+
+                // Linha da assinatura
+                $posX = $pdf->GetX();
+                $posY = $pdf->GetY();
+                $pdf->Cell(0, $alturaAssinatura, '', 1, 1, 'C'); // Célula para a assinatura
+                $pdf->Image($assinaturaImg, $posX + 40, $posY + 5, 60, 0);  // Ajuste fino da largura
+
+
+
+                // Nome
+                $pdf->SetFont('Arial', '', 12);
+                $pdf->Cell(40, $alturaTexto, utf8_decode("Nome:"), 1, 0, 'L');
+                $pdf->Cell(150, $alturaTexto, utf8_decode($assinatura['nome']), 1, 1, 'L');
+
+                // Campos extras (P/G, IDT, OM ou CPF)
+                foreach ($assinatura['campos_extras'] as $campo => $valor) {
+                    $pdf->Cell(40, $alturaTexto, utf8_decode($campo . ":"), 1, 0, 'L');
+                    $pdf->Cell(150, $alturaTexto, utf8_decode($valor), 1, 1, 'L');
+                }
+
+                $pdf->Ln(5); // Pequeno espaçamento entre as assinaturas
+
+            } catch (Exception $e) {
+                error_log('Erro ao processar a assinatura: ' . $e->getMessage());
+            }
+        }
+    }
+    // Gerando nome do arquivo PDF com timestamp
+    $timestamp = time();
+    $nomeArquivo = 'comercioArmasFogo_' . $dados['user_id'] . '_' . $timestamp . '.pdf';// Adicionando o timestamp
+
+    // Saída do PDF
+    $pdf->Output('F', 'PDF/FormulariosPDF/' . $nomeArquivo); // Adicionando o timestamp
+    return $nomeArquivo; // Adicionando o timestamp
+}
+
+try {
+    // Receber dados
+    $user_id = trim($_POST['user_id']);
+    $razao_social = trim($_POST['razao_social']);
+    $nome_fantasia = trim($_POST['nome_fantasia']);
+    $atividade_eco_principal = trim($_POST['atividade_eco_principal']);
+    $email = trim($_POST['email']);
+    $data = trim($_POST['data']);
+    $trcr = trim($_POST['trcr']);
+    $endereco = trim($_POST['endereco']);
+    $telefone = trim($_POST['telefone']);
+    $telefoneResidencial = trim($_POST['telefoneResidencial']);
+    $cnpj = trim($_POST['cnpj']);
+    $ponto_referencia = trim($_POST['ponto_referencia']);
+    $coordenada = trim($_POST['coordenada']);
+
+    $placaVeiculo = json_decode($_POST['placaVeiculo'], true);
+    $documentacaoVeiculo = json_decode($_POST['documentacaoVeiculo'], true);
+
+    //ENVIA INFORMAÇÕES DO ARRAY (EMPRESA E OBSERVAÇÕES)
+    $respostaDocumental = json_decode($_POST['respostaDocumental'] , true);
+    $observacoesDocumental = json_decode($_POST['observacoesDocumental'], true);
+    $user_id = json_decode($_POST['user_id'], true);    
+    
+    $respostaPce = json_decode($_POST['respostaPce'], true);
+    $observacoesPce = json_decode($_POST['observacoesPce'], true);
+        
+    $respostaSegurancaPce = json_decode($_POST['respostaSegurancaPce'], true);
+    $observacoesSegurancaPce = json_decode($_POST['observacoesSegurancaPce'], true);
+    
+    $respostaTransportePce = json_decode($_POST['respostaTransportePce'], true);
+    $observacoesTransportePce = json_decode($_POST['observacoesTransportePce'], true);
+
+    $respostaManutencaoArmaFogo = json_decode($_POST['respostaManutencaoArmaFogo'], true);
+    $observacoesManutencaoArmaFogo = json_decode($_POST['observacoesManutencaoArmaFogo'], true);
+    
+
+    // Receber assinaturas (base64 ou URLs)
+    $assinatura1 = $_POST['assinatura1'];
+    $assinatura2 = $_POST['assinatura2'];
+    $assinatura3 = $_POST['assinatura3'];
+    $assinatura4 = $_POST['assinatura4'];
+    
+    $lista_deficiencia = trim($_POST['lista_deficiencia']);
+    $observacoes_gerais = trim($_POST['observacoes_gerais']);
+    $qtd_autos_infracao = trim($_POST['qtd_autos_infracao']) ?? NULL;
+    $qtd_termos_aprensao = trim($_POST['qtd_termos_aprensao'])?? NULL;
+    $qtd_termos_depositario = trim($_POST['qtd_termos_depositario'])?? NULL;
+    $especificar_deficiencias = trim($_POST['especificar_deficiencias']);
+    $prazo_deficiencias = trim($_POST['prazo_deficiencias']);
+
+    $infracao = json_decode($_POST['infracao'], true);  
+
+
+    $nome_fiscal_militar = trim($_POST['nome_fiscal_militar']);
+    $fiscal_pg = trim($_POST['fiscal_pg']);
+    $idtmilitar = trim($_POST['idtmilitar']);
+    $ommilitar = trim($_POST['ommilitar']);
+    $nome_empresa = trim($_POST['nome_empresa']);
+    $cpf_empresa = trim($_POST['cpf_empresa']);
+    $testemunha1 = trim($_POST['testemunha1']);
+    $itdtestemunha1 = trim($_POST['itdtestemunha1']);
+    $testemunha2 = trim($_POST['testemunha2']);
+    $itdtestemunha2 = trim($_POST['itdtestemunha2']);
+    $imagensBase64 = json_decode($_POST['imagens'], true);
+
+
+    $listaApreensao = json_decode($_POST['listaApreensao'], true);
+    $listaInfracao = json_decode($_POST['listaInfracao'], true);
+
+
+    // Verificar se o dado 'imagens' foi enviado via POST
+    if (isset($_POST['imagens'])) {
+    // Decodificar o JSON que contém as imagens Base64
+    $imagensBase64 = json_decode($_POST['imagens'], true);
+
+    if (is_array($imagensBase64)) {
+        base64paraImagens($imagensBase64);  // Processar as imagens
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Formato de dados inválido.']);
+    }
+    } else {
+    echo json_encode(['status' => 'error', 'message' => 'Nenhuma imagem Base64 foi enviada.']);
+    }
+
+    // Log dos dados recebidos
+    error_log(print_r($_POST, true));
+
+    // Inicializa um array para armazenar as perguntas não preenchidas
+    $naoPreenchidas = [];
+
+     // Função para substituir valores nulos ou vazios por "Não se Aplica"
+     function substituirPorNaoSeAplica(&$array) {
+        foreach ($array as $indice => $valor) {
+            if (is_null($valor) || $valor === '') {
+                $array[$indice] = "Não se Aplica";
+            }
+        }
+    }
+    // Substitui valores vazios ou nulos nas observações e respostas por "Não se Aplica"
+    /*substituirPorNaoSeAplica($respostaDocumental);
+    substituirPorNaoSeAplica($respostaPce);
+    substituirPorNaoSeAplica($respostaSegurancaPce);
+    substituirPorNaoSeAplica($respostaTransportePce);
+    substituirPorNaoSeAplica($respostaManutencaoArmaFogo);*/
+
+    
+    substituirPorNaoSeAplica($observacoesDocumental);
+    substituirPorNaoSeAplica($observacoesPce);
+    substituirPorNaoSeAplica($observacoesSegurancaPce);
+    substituirPorNaoSeAplica($observacoesTransportePce);
+    substituirPorNaoSeAplica($observacoesManutencaoArmaFogo);
+
+    // Função para verificar se as respostas estão preenchidas
+    function verificarPreenchimento($perguntas, $tipoPergunta) {
+        global $naoPreenchidas;
+
+        foreach ($perguntas as $indice => $resposta) {
+            // Verifica se a resposta é nula, vazia ou não foi enviada
+            if (is_null($resposta) || $resposta === '' || !isset($resposta)) {
+                $naoPreenchidas[] = "Pergunta " . ($indice + 1) . " não foi preenchida ($tipoPergunta)";
+            }
+        }
+    }
+
+    // Verifica se as variáveis são arrays antes de chamar a função
+    if (is_array($respostaDocumental)) {
+        verificarPreenchimento($respostaDocumental, 'Verificação Documental (Sim) ou (Não)');
+    } else {
+        $naoPreenchidas[] = "Verificação Documental (Sim) ou (Não) não foi preenchida.";
+    }
+
+    if (is_array($observacoesDocumental)) {
+        verificarPreenchimento($observacoesDocumental, 'Verificação Documental em Observações');
+    } else {
+        $naoPreenchidas[] = "Observações Documental não foi preenchida.";
+    }
+
+    if (is_array($placaVeiculo)) {
+        verificarPreenchimento($placaVeiculo, 'Placa Veículo');
+    } else {
+        $naoPreenchidas[] = "Placa Veículo não foi preenchida.";
+    }
+    if (is_array($documentacaoVeiculo)) {
+        verificarPreenchimento($documentacaoVeiculo, 'Documentação Veículo');
+    } else {
+        $naoPreenchidas[] = "Documentação Veículo não foi preenchida.";
+    }
+    
+
+    // Verificação das respostas de execução e observações de execução
+    if (is_array($respostaPce)) {
+        verificarPreenchimento($respostaPce, 'Resposta PCE (Sim) ou (Não)');
+    } else {
+        $naoPreenchidas[] = "Resposta PCE (Sim) ou (Não) não foi preenchida.";
+    }
+
+    if (is_array($observacoesPce)) {
+        verificarPreenchimento($observacoesPce, 'Observações PCE (Sim) ou (Não)');
+    } else {
+        $naoPreenchidas[] = "Observações PCE não foram preenchidas.";
+    }
+    
+ 
+    // Verificação das respostas de execução e observações de execução
+    if (is_array($respostaSegurancaPce)) {
+        verificarPreenchimento($respostaSegurancaPce, 'Segurança PCE (Sim) ou (Não)');
+    } else {
+        $naoPreenchidas[] = "Segurança PCE (Sim) ou (Não) não foi preenchida.";
+    }
+
+    if (is_array($observacoesSegurancaPce)) {
+        verificarPreenchimento($observacoesSegurancaPce, 'Observações Segurança PCE');
+    } else {
+        $naoPreenchidas[] = "Observações Segurança PCE não foram preenchidas.";
+    }
+    
+
+    if (is_array($respostaTransportePce)) {
+        verificarPreenchimento($respostaTransportePce, 'Verificação Transporte PCE (Sim) ou (Não)');
+    } else {
+        $naoPreenchidas[] = "Transporte PCE (Sim) ou (Não) não foi preenchida.";
+    }
+
+    if (is_array($observacoesTransportePce)) {
+        verificarPreenchimento($observacoesTransportePce, 'Verificação Observacoes Transporte PCE');
+    } else {
+        $naoPreenchidas[] = "Observacoes Transporte PCE não foram preenchidas.";
+    }
+
+
+    
+    if (is_array($respostaManutencaoArmaFogo)) {
+        verificarPreenchimento($respostaManutencaoArmaFogo, 'Verificação Manutenção Arma Fogo (Sim) ou (Não)');
+    } else {
+        $naoPreenchidas[] = "Manutenção Arma Fogo (Sim) ou (Não) não foi preenchida.";
+    }
+
+    if (is_array($observacoesManutencaoArmaFogo)) {
+        verificarPreenchimento($observacoesManutencaoArmaFogo, 'Verificação Observações Manutenção Arma Fogo');
+    } else {
+        $naoPreenchidas[] = "Observações Manutenção Arma Fogo não foram preenchidas.";
+    }
+    
+
+    // Verificação da infração
+    if (is_array($infracao)) {
+        verificarPreenchimento($infracao, 'Infração');
+    } else {
+        $naoPreenchidas[] = "Infração não foi preenchida.";
+    }
+
+    // Se houver perguntas não preenchidas, retorna um erro
+    if (!empty($naoPreenchidas)) {
+        // Juntar as mensagens em uma única string
+        $mensagem = implode("\n", $naoPreenchidas);
+        echo json_encode(["status" => "error", "message" => $mensagem]);
+        exit;
+    } 
+    
+
+    // Verificar campos em branco
+    if (empty($email)){
+        echo json_encode(["status" => "error", "message" => "Campo Email em branco."]);
+        exit;
+    }
+    if (empty($data)){
+        echo json_encode(["status" => "error", "message" => "Campo Data em branco."]);
+        exit;
+    }
+    if (empty($razao_social)){
+        echo json_encode(["status" => "error", "message" => "Campo RazaoSocial em branco."]);
+        exit;
+    }
+    if (empty($nome_fantasia)){
+        echo json_encode(["status" => "error", "message" => "Campo Nome Fantasia em branco."]);
+        exit;
+    }
+    if (empty($atividade_eco_principal)){
+    echo json_encode(["status" => "error", "message" => "Campo Atividade Econômica Principal em branco."]);
+    exit;
+    }
+    
+    if (empty($trcr)){
+        echo json_encode(["status" => "error", "message" => "Campo TRCR em branco."]);
+        exit;
+    }
+    if (empty($endereco)){
+        echo json_encode(["status" => "error", "message" => "Campo Endereço em branco."]);
+        exit;
+    }
+    if (empty($cnpj)){
+        echo json_encode(["status" => "error", "message" => "Campo CNPJ em branco."]);
+        exit;
+    }
+    if (empty($telefone)){
+            echo json_encode(["status" => "error", "message" => "Campo Telefone em branco."]);
+            exit;
+    }
+    if (empty($telefoneResidencial)){
+        echo json_encode(["status" => "error", "message" => "Campo Telefone em branco."]);
+        exit;
+    }
+    if (empty($ponto_referencia)){
+        echo json_encode(["status" => "error", "message" => "Campo Ponto de Referência em branco."]);
+        exit;
+    }
+    if (empty($coordenada)){
+        echo json_encode(["status" => "error", "message" => "Campo Coordenada em branco."]);
+        exit;
+    }
+    if (empty($lista_deficiencia)){
+        echo json_encode(["status" => "error", "message" => "Campo Lista Deficiencia em branco."]);
+        exit;
+    }
+    if (empty($observacoes_gerais)){
+        echo json_encode(["status" => "error", "message" => "Campo Observações Gerais em branco."]);
+        exit;
+    }
+    if (empty($qtd_autos_infracao || $qtd_autos_infracao !== 0)){
+        echo json_encode(["status" => "error", "message" => "Campo Qtd Autos Infração em branco."]);
+        exit;
+    }
+    if (empty($qtd_termos_aprensao || $qtd_termos_aprensao !== 0)){
+        echo json_encode(["status" => "error", "message" => "Campo Qtd Termos Apreensão em branco."]);
+        exit;
+    }
+    if (empty($qtd_termos_depositario || $qtd_termos_depositario !== 0)){
+        echo json_encode(["status" => "error", "message" => "Campo Qtd Termos Depositário em branco."]);
+        exit;
+    }
+    if (empty($especificar_deficiencias)){
+        echo json_encode(["status" => "error", "message" => "Campo Especificar Deficiencias Encontradas em branco."]);
+        exit;
+    }
+    if (empty($prazo_deficiencias)){
+        echo json_encode(["status" => "error", "message" => "Campo Prazo Deficiencias em branco."]);
+        exit;
+    }
+    if (empty($nome_fiscal_militar)){
+        echo json_encode(["status" => "error", "message" => "Campo Nome Fiscal Militar em branco."]);
+        exit;
+    }
+    if (empty($idtmilitar)){
+        echo json_encode(["status" => "error", "message" => "Campo IDT Militar em branco."]);
+        exit;
+    }
+    if (empty($fiscal_pg)){
+        echo json_encode(["status" => "error", "message" => "Campo Fiscal PG em branco."]);
+        exit;
+    }
+    if (empty($ommilitar)){
+        echo json_encode(["status" => "error", "message" => "Campo OM Militar em branco."]);
+        exit;
+    }
+    if (empty($nome_empresa)){
+        echo json_encode(["status" => "error", "message" => "Campo Nome Empresa em branco."]);
+        exit;
+    }
+    if (empty($cpf_empresa)){
+        echo json_encode(["status" => "error", "message" => "Campo CPF Empresa em branco."]);
+        exit;
+    }
+    if (empty($testemunha1)){
+        echo json_encode(["status" => "error", "message" => "Campo Nome Testemunha 1 em branco."]);
+        exit;
+    }
+    if (empty($itdtestemunha1)){
+        echo json_encode(["status" => "error", "message" => "Campo Itd Testemunha 1 em branco."]);
+        exit;
+    }
+    if (empty($testemunha2)){
+        echo json_encode(["status" => "error", "message" => "Campo Nome Testemunha 2 em branco."]);
+        exit;
+    }
+    if (empty($itdtestemunha2)){
+        echo json_encode(["status" => "error", "message" => "Campo Itd Testemunha 2 em branco."]);
+        exit;
+    }
+
+    //Verificar tamanhos dos campos
+    $maximoComprimentoCamposRazaoSocial = 200;
+    if(strlen($razao_social) > $maximoComprimentoCamposRazaoSocial ){
+        $response = array("status" => "error", "message" => "A Razão Social não pode conter mais que $maximoComprimentoCamposRazaoSocial caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoNomeFantasia = 200;
+    if(strlen($nome_fantasia) > $maximoComprimentoCampoNomeFantasia ){
+        $response = array("status" => "error", "message" => "A Razão Social não pode conter mais que $maximoComprimentoCampoNomeFantasia caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCamposAtividadeEcoPrincipal = 200;
+    if(strlen($atividade_eco_principal) > $maximoComprimentoCamposAtividadeEcoPrincipal ){
+        $response = array("status" => "error", "message" => "A Razão Social não pode conter mais que $maximoComprimentoCamposAtividadeEcoPrincipal caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCamposTRCR = 200;
+    if(strlen($trcr) > $maximoComprimentoCamposTRCR ){
+        $response = array("status" => "error", "message" => "O TR/CR não pode conter mais que $maximoComprimentoCamposTRCR caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCamposCnpj = 18;
+    if(strlen($cnpj) < $maximoComprimentoCamposCnpj ){
+        $response = array("status" => "error", "message" => "O campo do CNPJ não pode conter menos que $maximoComprimentoCamposCnpj caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCamposEndereco = 200;
+    if(strlen($endereco) > $maximoComprimentoCamposEndereco ){
+        $response = array("status" => "error", "message" => "O campo Endereço não pode conter mais que $maximoComprimentoCamposEndereco caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCamposTelefone = 15;
+    if(strlen($telefone) < $maximoComprimentoCamposTelefone ){
+        $response = array("status" => "error", "message" => "O Campo Telefone não pode conter mais que $maximoComprimentoCamposTelefone caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCamposTelefoneResidencial = 14;
+    if(strlen($telefoneResidencial) < $maximoComprimentoCamposTelefoneResidencial ){
+        $response = array("status" => "error", "message" => "O Campo Telefone não pode conter mais que $maximoComprimentoCamposTelefoneResidencial caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoEmail = 200;
+    if(strlen($email) > $maximoComprimentoCampoEmail ){
+        $response = array("status" => "error", "message" => "O Email não pode conter mais que $maximoComprimentoCampoEmail caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCamposData = 10;
+    if(strlen($data) < $maximoComprimentoCamposData ){
+        $response = array("status" => "error", "message" => "O Campo Data não pode conter menos que $maximoComprimentoCamposData caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoReferencia = 200;
+    if(strlen($ponto_referencia) > $maximoComprimentoReferencia ){
+        $response = array("status" => "error", "message" => "Ponto de Referência não pode conter mais que $maximoComprimentoReferencia caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoCoordenada = 200;
+    if(strlen($coordenada) > $maximoComprimentoCampoCoordenada ){
+        $response = array("status" => "error", "message" => "A Coordenada não pode conter mais que $maximoComprimentoCampoCoordenada caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoDeficiencia = 200;
+    if(strlen($lista_deficiencia) > $maximoComprimentoCampoDeficiencia ){
+        $response = array("status" => "error", "message" => "O Campo Lista Deficiência não pode conter mais que $maximoComprimentoCampoDeficiencia caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoOBSgerais = 200;
+    if(strlen($observacoes_gerais) > $maximoComprimentoCampoOBSgerais ){
+        $response = array("status" => "error", "message" => "O Campo Observações Gerais não pode conter mais que $maximoComprimentoCampoOBSgerais caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoQtdAutoInfracao = 2;
+    if(strlen($qtd_autos_infracao) > $maximoComprimentoCampoQtdAutoInfracao ){
+        $response = array("status" => "error", "message" => "A Qtd Auto Infração não pode conter mais que $maximoComprimentoCampoQtdAutoInfracao caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoQtdTermosApreensao = 2;
+    if(strlen($qtd_termos_aprensao) > $maximoComprimentoCampoQtdTermosApreensao ){
+        $response = array("status" => "error", "message" => "A Qtd Termos Apreensão  não pode conter mais que $maximoComprimentoCampoQtdTermosApreensao caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoQtdTermosFielDepositario = 2;
+    if(strlen($qtd_termos_depositario) > $maximoComprimentoCampoQtdTermosFielDepositario ){
+        $response = array("status" => "error", "message" => "A Qtd Termos Fiel Depositário não pode conter mais que $maximoComprimentoCampoQtdTermosFielDepositario caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoEspecificarDef = 50;
+    if(strlen($especificar_deficiencias) > $maximoComprimentoCampoEspecificarDef ){
+        $response = array("status" => "error", "message" => "O Campo Especificar Deficiências não pode conter mais que $maximoComprimentoCampoEspecificarDef caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoPrazoDef = 2;
+    if(strlen($prazo_deficiencias) > $maximoComprimentoCampoPrazoDef ){
+        $response = array("status" => "error", "message" => "O Campo Prazo não pode conter mais que $maximoComprimentoCampoPrazoDef caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoNomeFiscalMilitar = 200;
+    if(strlen($nome_fiscal_militar) > $maximoComprimentoCampoNomeFiscalMilitar ){
+        $response = array("status" => "error", "message" => "O Nome Fiscal Militar não pode conter mais que $maximoComprimentoCampoNomeFiscalMilitar caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoIDTmilitar = 200;
+    if(strlen($idtmilitar) > $maximoComprimentoCampoIDTmilitar ){
+        $response = array("status" => "error", "message" => "O Campo IDT Militar não pode conter mais que $maximoComprimentoCampoIDTmilitar caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoPG = 200;
+    if(strlen($fiscal_pg) > $maximoComprimentoCampoPG ){
+        $response = array("status" => "error", "message" => "O Campo P/G não pode conter mais que $maximoComprimentoCampoPG caracteres");
+        echo json_encode($response);
+        exit;
+    }   
+    $maximoComprimentoCampoOM = 200;
+    if(strlen($ommilitar) > $maximoComprimentoCampoOM ){
+        $response = array("status" => "error", "message" => "O Campo OM Militar não pode conter mais que $maximoComprimentoCampoOM caracteres");
+        echo json_encode($response);
+        exit;
+    } 
+    $maximoComprimentoCampoNomeEmpresa = 200;
+    if(strlen($nome_empresa) > $maximoComprimentoCampoNomeEmpresa ){
+        $response = array("status" => "error", "message" => "O Campo Nome Empresa não pode conter mais que $maximoComprimentoCampoNomeEmpresa caracteres");
+        echo json_encode($response);
+        exit;
+    }  
+    $maximoComprimentoCampoCPFempresa = 200;
+    if(strlen($cpf_empresa) > $maximoComprimentoCampoCPFempresa ){
+        $response = array("status" => "error", "message" => "O Campo CPF Empresa não pode conter mais que $maximoComprimentoCampoCPFempresa caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoTestemunha1Nome = 200;
+    if(strlen($testemunha1) > $maximoComprimentoCampoTestemunha1Nome ){
+        $response = array("status" => "error", "message" => "O Campo Nome Testemunha 1 não pode conter mais que $maximoComprimentoCampoTestemunha1Nome caracteres");
+        echo json_encode($response);
+        exit;
+    } 
+    $maximoComprimentoCampoTestemunha1ITD = 200;
+    if(strlen($itdtestemunha1) > $maximoComprimentoCampoTestemunha1ITD ){
+        $response = array("status" => "error", "message" => "O Campo ITD Militar Testemunha 1 não pode conter mais que $maximoComprimentoCampoTestemunha1ITD caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoTestemunha2Nome = 200;
+    if(strlen($testemunha2) > $maximoComprimentoCampoTestemunha2Nome ){
+        $response = array("status" => "error", "message" => "O Campo Nome Testemunha 2 não pode conter mais que $maximoComprimentoCampoTestemunha2Nome caracteres");
+        echo json_encode($response);
+        exit;
+    }
+    $maximoComprimentoCampoTestemunha2ITD = 200;
+    if(strlen($itdtestemunha2) > $maximoComprimentoCampoTestemunha2ITD ){
+        $response = array("status" => "error", "message" => "O Campo ITD Militar Testemunha 2 não pode conter mais que $maximoComprimentoCampoTestemunha2ITD caracteres");
+        echo json_encode($response);
+        exit;
+    }
+
+    //Recuperar o ultimo numero gerado apos o INSERT
+    $numeroUnicoInserido = $conexao->lastInsertId();
+
+    // Gerar PDF
+    $dadosPDF = [
+        'user_id' => $user_id,
+        'numeroUnico' => $numeroUnico,
+        'razao_social' => $razao_social,
+        'nome_fantasia' => $nome_fantasia,
+        'atividade_eco_principal' => $atividade_eco_principal,
+        'email' => $email,
+        'data' => $data,
+        'trcr' => $trcr,
+        'endereco' => $endereco,
+        'telefone' => $telefone,
+        'telefoneResidencial' => $telefoneResidencial,
+        'cnpj' => $cnpj,
+  
+        'ponto_referencia' => $ponto_referencia,
+        'coordenada' => $coordenada,
+        
+        'placaVeiculo' => $placaVeiculo,
+        'documentacaoVeiculo' => $documentacaoVeiculo,
+
+
+        'respostaDocumental' => $respostaDocumental,
+        'observacoesDocumental' => $observacoesDocumental,
+        'respostaPce' => $respostaPce,
+        'observacoesPce' => $observacoesPce,
+        'respostaSegurancaPce' => $respostaSegurancaPce,
+        'observacoesSegurancaPce' => $observacoesSegurancaPce,
+        'respostaTransportePce' => $respostaTransportePce,
+        'observacoesTransportePce' => $observacoesTransportePce,
+        'respostaManutencaoArmaFogo' => $respostaManutencaoArmaFogo,
+        'observacoesManutencaoArmaFogo' => $observacoesManutencaoArmaFogo,
+       
+        'lista_deficiencia' => $lista_deficiencia,
+        'observacoes_gerais' => $observacoes_gerais,
+        'infracao' => $infracao,
+        'qtd_autos_infracao' => $qtd_autos_infracao,
+        'qtd_termos_aprensao' => $qtd_termos_aprensao,
+        'qtd_termos_depositario' => $qtd_termos_depositario,
+        'especificar_deficiencias' => $especificar_deficiencias,
+        'prazo_deficiencias' => $prazo_deficiencias,
+        
+        'assinatura1' => $assinatura1,
+        'assinatura2' => $assinatura2,
+        'assinatura3' => $assinatura3,
+        'assinatura4' => $assinatura4,
+
+        'nome_fiscal_militar' => $nome_fiscal_militar,
+        'fiscal_pg' => $fiscal_pg,
+        'idtmilitar' => $idtmilitar,
+        'ommilitar' => $ommilitar,
+        'nome_empresa' => $nome_empresa,
+        'cpf_empresa' => $cpf_empresa,
+        'testemunha1' => $testemunha1,
+        'itdtestemunha1' => $itdtestemunha1,
+        'testemunha2' => $testemunha2,
+        'itdtestemunha2' => $itdtestemunha2,
+        'imagens' => $imagensSalvas,
+
+        ];
+
+    $nomeArquivoPDF = gerarPDF($dadosPDF);
+
+    // Inserir no banco
+$stmt = $conexao->prepare("INSERT INTO comercio (user_id, razao_social, nome_fantasia, 
+atividade_eco_principal, trcr, cnpj, endereco, telefone, telefoneResidencial, email, data, 
+ponto_referencia, coordenada, pdf_file) VALUES (:user_id, :razao_social, :nome_fantasia, 
+:atividade_eco_principal, :trcr, :cnpj, :endereco, :telefone, :telefoneResidencial, :email, 
+:data, :ponto_referencia, :coordenada, :pdf_file)");
+$stmt->bindParam(':user_id', $user_id);
+$stmt->bindParam(':razao_social', $razao_social);
+$stmt->bindParam(':nome_fantasia', $nome_fantasia);
+$stmt->bindParam(':atividade_eco_principal', $atividade_eco_principal);
+$stmt->bindParam(':trcr', $trcr);
+$stmt->bindParam(':cnpj', $cnpj);
+$stmt->bindParam(':endereco', $endereco);
+$stmt->bindParam(':telefone', $telefone);
+$stmt->bindParam(':telefoneResidencial', $telefoneResidencial);
+$stmt->bindParam(':email', $email);
+$stmt->bindParam(':data', $data);
+$stmt->bindParam(':ponto_referencia', $ponto_referencia);
+$stmt->bindParam(':coordenada', $coordenada);
+$stmt->bindParam(':pdf_file', $nomeArquivoPDF);
+$stmt->execute();
+
+$comercio_id = $conexao->lastInsertId();
+
+$stmtRespostas = $conexao->prepare("INSERT INTO comercio_verificacao_documental (user_id, comercio_id, respostaDocumental, observacoesDocumental) VALUES (:user_id, :comercio_id, :respostaDocumental, :observacoesDocumental)");
+for ($i = 0; $i < count($respostaDocumental); $i++) {
+    $stmtRespostas->bindParam(':user_id', $user_id);
+    $stmtRespostas->bindParam(':comercio_id', $comercio_id);
+    $stmtRespostas->bindValue(':respostaDocumental', $respostaDocumental[$i]);
+    $stmtRespostas->bindValue(':observacoesDocumental', $observacoesDocumental[$i]);
+    $stmtRespostas->execute();
+}
+$stmtRespostasPCE = $conexao->prepare("INSERT INTO comercio_verificacao_pce (user_id, comercio_id, respostaPce, observacoesPce) VALUES (:user_id, :comercio_id, :respostaPce, :observacoesPce)");
+for ($i = 0; $i < count($respostaPce); $i++) {
+    $stmtRespostasPCE->bindParam(':user_id', $user_id);
+    $stmtRespostasPCE->bindParam(':comercio_id', $comercio_id);
+    $stmtRespostasPCE->bindValue(':respostaPce', $respostaPce[$i]);
+    $stmtRespostasPCE->bindValue(':observacoesPce', $observacoesPce[$i]);
+    $stmtRespostasPCE->execute();
+}
+$stmtRespostasSegurançaPCE = $conexao->prepare("INSERT INTO comercio_seguranca_pce (user_id, comercio_id, respostaSegurancaPce, observacoesSegurancaPce) VALUES (:user_id, :comercio_id, :respostaSegurancaPce, :observacoesSegurancaPce)");
+for ($i = 0; $i < count($respostaSegurancaPce); $i++) {
+    $stmtRespostasSegurançaPCE->bindParam(':user_id', $user_id);
+    $stmtRespostasSegurançaPCE->bindParam(':comercio_id', $comercio_id);
+    $stmtRespostasSegurançaPCE->bindValue(':respostaSegurancaPce', $respostaSegurancaPce[$i]);
+    $stmtRespostasSegurançaPCE->bindValue(':observacoesSegurancaPce', $observacoesSegurancaPce[$i]);
+    $stmtRespostasSegurançaPCE->execute();
+}
+$stmtRespostasTransportePCE = $conexao->prepare("INSERT INTO comercio_transporte_pce (user_id, comercio_id, respostaTransportePce, observacoesTransportePce) VALUES (:user_id, :comercio_id, :respostaTransportePce, :observacoesTransportePce)");
+for ($i = 0; $i < count($respostaTransportePce); $i++) {
+    $stmtRespostasTransportePCE->bindParam(':user_id', $user_id);
+    $stmtRespostasTransportePCE->bindParam(':comercio_id', $comercio_id);
+    $stmtRespostasTransportePCE->bindValue(':respostaTransportePce', $respostaTransportePce[$i]);
+    $stmtRespostasTransportePCE->bindValue(':observacoesTransportePce', $observacoesTransportePce[$i]);
+    $stmtRespostasTransportePCE->execute();
+}
+$stmtRespostasCampoTransportePCE = $conexao->prepare("INSERT INTO comercio_transporte_campo_pce (user_id, comercio_id, placaVeiculo, documentacaoVeiculo) VALUES (:user_id, :comercio_id, :placaVeiculo, :documentacaoVeiculo)");
+for ($i = 0; $i < count($placaVeiculo); $i++) {
+    $stmtRespostasCampoTransportePCE->bindParam(':user_id', $user_id);
+    $stmtRespostasCampoTransportePCE->bindParam(':comercio_id', $comercio_id);
+    $stmtRespostasCampoTransportePCE->bindValue(':placaVeiculo', $placaVeiculo[$i]);
+    $stmtRespostasCampoTransportePCE->bindValue(':documentacaoVeiculo', $documentacaoVeiculo[$i]);
+    $stmtRespostasCampoTransportePCE->execute();
+}
+$comercio_manutencao_arma_fogo = $conexao->prepare("INSERT INTO comercio_manutencao_arma_fogo (user_id, comercio_id, respostaManutencaoArmaFogo, observacoesManutencaoArmaFogo) VALUES (:user_id, :comercio_id, :respostaManutencaoArmaFogo, :observacoesManutencaoArmaFogo)");
+for ($i = 0; $i < count($respostaManutencaoArmaFogo); $i++) {
+    $comercio_manutencao_arma_fogo->bindParam(':user_id', $user_id);
+    $comercio_manutencao_arma_fogo->bindParam(':comercio_id', $comercio_id);
+    $comercio_manutencao_arma_fogo->bindValue(':respostaManutencaoArmaFogo', $respostaManutencaoArmaFogo[$i]);
+    $comercio_manutencao_arma_fogo->bindValue(':observacoesManutencaoArmaFogo', $observacoesManutencaoArmaFogo[$i]);
+    $comercio_manutencao_arma_fogo->execute();
+}
+
+
+// Inserção na tabela deficiencias_observacoes_comercio
+$smtpinfracao = $conexao->prepare("INSERT INTO comercio_deficiencias_observacoes_encontradas (user_id, comercio_id, lista_deficiencia, observacoes_gerais, infracao, qtd_autos_infracao, qtd_termos_aprensao, qtd_termos_depositario, especificar_deficiencias, prazo_deficiencias, nome_fiscal_militar, fiscal_pg, idtmilitar, ommilitar, nome_empresa, cpf_empresa, testemunha1, itdtestemunha1, testemunha2, itdtestemunha2) VALUES (:user_id, :comercio_id, :lista_deficiencia, :observacoes_gerais, :infracao, :qtd_autos_infracao, :qtd_termos_aprensao, :qtd_termos_depositario, :especificar_deficiencias, :prazo_deficiencias, :nome_fiscal_militar, :fiscal_pg, :idtmilitar, :ommilitar, :nome_empresa, :cpf_empresa, :testemunha1, :itdtestemunha1, :testemunha2, :itdtestemunha2)");
+
+// Bind dos parâmetros fora do loop
+$smtpinfracao->bindParam(':user_id', $user_id);
+$smtpinfracao->bindParam(':comercio_id', $comercio_id);
+$smtpinfracao->bindParam(':lista_deficiencia', $lista_deficiencia);
+$smtpinfracao->bindParam(':observacoes_gerais', $observacoes_gerais);
+$smtpinfracao->bindParam(':qtd_autos_infracao', $qtd_autos_infracao);
+$smtpinfracao->bindParam(':qtd_termos_aprensao', $qtd_termos_aprensao);
+$smtpinfracao->bindParam(':qtd_termos_depositario', $qtd_termos_depositario);
+$smtpinfracao->bindParam(':especificar_deficiencias', $especificar_deficiencias);
+$smtpinfracao->bindParam(':prazo_deficiencias', $prazo_deficiencias);
+$smtpinfracao->bindParam(':nome_fiscal_militar', $nome_fiscal_militar);
+$smtpinfracao->bindParam(':fiscal_pg', $fiscal_pg);
+$smtpinfracao->bindParam(':idtmilitar', $idtmilitar);
+$smtpinfracao->bindParam(':ommilitar', $ommilitar);
+$smtpinfracao->bindParam(':nome_empresa', $nome_empresa);
+$smtpinfracao->bindParam(':cpf_empresa', $cpf_empresa);
+$smtpinfracao->bindParam(':testemunha1', $testemunha1);
+$smtpinfracao->bindParam(':itdtestemunha1', $itdtestemunha1);
+$smtpinfracao->bindParam(':testemunha2', $testemunha2);
+$smtpinfracao->bindParam(':itdtestemunha2', $itdtestemunha2);
+
+for ($i = 0; $i < count($infracao); $i++) {
+    $smtpinfracao->bindValue(':infracao', $infracao[$i]);
+    $smtpinfracao->execute();
+}
+
+$listaApreensao = isset($_POST['listaApreensao']) ? json_decode($_POST['listaApreensao'], true) : null;
+
+if (!is_array($listaApreensao) || empty($listaApreensao)) {
+    error_log("Nenhuma apreensão enviada ou JSON inválido.");
+} else {
+    // Preparar a query de inserção
+    $stmt = $conexao->prepare("INSERT INTO comercio_apreensao (comercio_id, data_hora, estadoIdSelecionado, cidade, produto, qtdApreensao, unidade, tipo, marca, obs)
+                               VALUES (:comercio_id, :data_hora, :estadoIdSelecionado, :cidade, :produto, :qtdApreensao, :unidade, :tipo, :marca, :obs)");
+
+    foreach ($listaApreensao as $apreensao) {
+        $data_hora = isset($apreensao['data_hora']) ? trim($apreensao['data_hora']) : null;
+        $estadoIdSelecionado = isset($apreensao['estadoIdSelecionado']) ? intval($apreensao['estadoIdSelecionado']) : null;
+        $cidade = isset($apreensao['cidade']) ? trim($apreensao['cidade']) : null;
+
+        if (!empty($data_hora) && !empty($estadoIdSelecionado) && !empty($cidade)) {
+            // Agora iteramos sobre a lista de produtos
+            if (!empty($apreensao['produtos']) && is_array($apreensao['produtos'])) {
+                foreach ($apreensao['produtos'] as $produto) {
+                    $produtoNome = isset($produto['produto']) ? trim($produto['produto']) : null;
+                    $qtdApreensao = isset($produto['qtdApreensao']) ? trim($produto['qtdApreensao']) : null;
+                    $unidade = isset($produto['unidade']) ? trim($produto['unidade']) : null;
+                    $tipo = isset($produto['tipo']) ? trim($produto['tipo']) : null;
+                    $marca = isset($produto['marca']) ? trim($produto['marca']) : null;
+                    $obs = isset($produto['obs']) ? trim($produto['obs']) : null;
+
+                    if (!empty($produtoNome)) {
+                        $stmt->bindParam(':comercio_id', $comercio_id, PDO::PARAM_INT);
+                        $stmt->bindParam(':data_hora', $data_hora, PDO::PARAM_STR);
+                        $stmt->bindParam(':estadoIdSelecionado', $estadoIdSelecionado, PDO::PARAM_INT);
+                        $stmt->bindParam(':cidade', $cidade, PDO::PARAM_STR);
+                        $stmt->bindParam(':produto', $produtoNome, PDO::PARAM_STR);
+                        $stmt->bindParam(':qtdApreensao', $qtdApreensao, PDO::PARAM_STR);
+                        $stmt->bindParam(':unidade', $unidade, PDO::PARAM_STR);
+                        $stmt->bindParam(':tipo', $tipo, PDO::PARAM_STR);
+                        $stmt->bindParam(':marca', $marca, PDO::PARAM_STR);
+                        $stmt->bindParam(':obs', $obs, PDO::PARAM_STR);
+                        $stmt->execute();
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+function gerarPDFListaApreensao($dados) {
+    // Instanciando a classe FPDF
+    $pdf = new FPDF();
+
+    foreach ($dados['listaApreensao'] as $apreensao) {
+        $pdf->AddPage();
+        $pdf->SetFont('Times', '', 12);
+
+        // Cabeçalho do termo
+        $pdf->SetFont('Times', '', 14);
+        $pdf->Cell(0, 10, utf8_decode('Anexo "D"'), 0, 1, 'C');
+        $pdf->Cell(0, 10, utf8_decode('Lista de Apreensão'), 0, 1, 'C');
+        $pdf->Ln(10);
+
+        // Caminho relativo ao logotipo
+        $logoPath = __DIR__ . '/../../logo.png';
+        if (file_exists($logoPath)) {
+            $pdf->Image($logoPath, ($pdf->GetPageWidth() - 20) / 2, $pdf->GetY(), 20);
+            $pdf->Ln(30);
+        }
+
+        // Informações institucionais
+        $pdf->SetFont('Times', '', 12);
+        $pdf->Cell(0, 10, utf8_decode('Ministério da Defesa'), 0, 1, 'C');
+        $pdf->Cell(0, 10, utf8_decode('Comando Militar do Sul'), 0, 1, 'C');
+        $pdf->Ln(10);
+
+        // Número do termo
+        $pdf->Cell(0, 10, utf8_decode('Nº ' . $dados['numeroUnico'] . ' / ' . date('d/m/Y') . ' /SFPC/3º GAAAe'), 0, 1, 'C');
+        $pdf->Ln(10);
+
+        // Cabeçalho da tabela
+        $pdf->SetFont('Times', 'B', 12);
+        $pdf->Cell(30, 10, utf8_decode('Data/Hora'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Estado'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Cidade'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Produto'), 1, 0, 'C');
+        $pdf->Cell(20, 10, utf8_decode('Qtd'), 1, 0, 'C');
+        $pdf->Cell(20, 10, utf8_decode('Unidade'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Tipo'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Marca'), 1, 0, 'C');
+        $pdf->Cell(50, 10, utf8_decode('Observação'), 1, 1, 'C');
+
+        $pdf->SetFont('Times', '', 12);
+
+        $qtdProdutos = count($apreensao['produtos']); // Conta os produtos deste termo
+
+        // Primeira linha com os dados gerais
+        $pdf->Cell(30, 10 * $qtdProdutos, utf8_decode($apreensao['data_hora']), 1, 0, 'C');
+        $pdf->Cell(30, 10 * $qtdProdutos, utf8_decode($apreensao['estadoIdSelecionado']), 1, 0, 'C');
+        $pdf->Cell(30, 10 * $qtdProdutos, utf8_decode($apreensao['cidade']), 1, 0, 'C');
+
+        $primeiroProduto = true;
+
+        // Percorre os produtos da apreensão
+        foreach ($apreensao['produtos'] as $produto) {
+            if (!$primeiroProduto) {
+                // Pula as 3 colunas mescladas nas próximas linhas
+                $pdf->Cell(30, 10, '', 0, 0);
+                $pdf->Cell(30, 10, '', 0, 0);
+                $pdf->Cell(30, 10, '', 0, 0);
+            }
+
+            // Exibe os produtos
+            $pdf->Cell(30, 10, utf8_decode($produto['produto']), 1, 0, 'C');
+            $pdf->Cell(20, 10, utf8_decode($produto['qtdApreensao']), 1, 0, 'C');
+            $pdf->Cell(20, 10, utf8_decode($produto['unidade']), 1, 0, 'C');
+            $pdf->Cell(30, 10, utf8_decode($produto['tipo']), 1, 0, 'C');
+            $pdf->Cell(30, 10, utf8_decode($produto['marca']), 1, 0, 'C');
+            $pdf->Cell(50, 10, utf8_decode($produto['obs']), 1, 1, 'C');
+
+            $primeiroProduto = false;
+        }
+    }
+
+    // Gerando nome do arquivo
+    $timestamp = time();
+    $nomeArquivo = 'lista_apreensao_' . $dados['user_id'] . '_' . $timestamp . '.pdf';
+   
+    // Saída do PDF
+    $pdf->Output('F', 'PDF/FormulariosPDF/' . $nomeArquivo);
+    return $nomeArquivo;
+}
+
+
+
+
+// Verificar se 'listaApreensao' foi enviada e se é um JSON válido
+$listaApreensao = isset($_POST['listaApreensao']) ? json_decode($_POST['listaApreensao'], true) : null;
+
+if (is_array($listaApreensao) && !empty($listaApreensao)) {
+    $dadosPDFLista = [
+        'user_id' => $user_id,
+        'numeroUnico' => $numeroUnico,
+        'listaApreensao' => $listaApreensao,
+    ];
+    $nomeArquivoPDFLista = gerarPDFListaApreensao($dadosPDFLista);
+}
+
+
+// Infracao
+$listaInfracao = isset($_POST['listaInfracao']) ? json_decode($_POST['listaInfracao'], true) : null;
+
+if (!is_array($listaInfracao) || empty($listaInfracao)) {
+    error_log("Nenhuma infração enviada ou JSON inválido.");
+} else {
+    // Preparar a query de inserção
+    $stmt = $conexao->prepare("INSERT INTO comercio_infracao
+        (comercio_id, data_hora_infracao, estadoIdSelecionado_infracao, cidade_infracao,
+        produto_infracao, qtdApreensao_infracao, unidade_infracao, tipo_infracao, marca_infracao, obs_infracao)
+        VALUES
+        (:comercio_id, :data_hora_infracao, :estadoIdSelecionado_infracao, :cidade_infracao,
+        :produto_infracao, :qtdApreensao_infracao, :unidade_infracao, :tipo_infracao, :marca_infracao, :obs_infracao)");
+
+    foreach ($listaInfracao as $infracao) {
+        $data_hora_infracao = isset($infracao['data_hora_infracao']) ? trim($infracao['data_hora_infracao']) : null;
+        $estadoIdSelecionado_infracao = isset($infracao['estadoIdSelecionado_infracao']) ? intval($infracao['estadoIdSelecionado_infracao']) : null;
+        $cidade_infracao = isset($infracao['cidade_infracao']) ? trim($infracao['cidade_infracao']) : null;
+
+        if (!empty($data_hora_infracao) && !empty($estadoIdSelecionado_infracao) && !empty($cidade_infracao)) {
+            // Agora iteramos sobre a lista de produtos da infração
+            if (!empty($infracao['produtos_infracao']) && is_array($infracao['produtos_infracao'])) {
+                foreach ($infracao['produtos_infracao'] as $produto) {
+                    $produto_infracao = isset($produto['produto_infracao']) ? trim($produto['produto_infracao']) : null;
+                    $qtdApreensao_infracao = isset($produto['qtdApreensao_infracao']) ? trim($produto['qtdApreensao_infracao']) : null;
+                    $unidade_infracao = isset($produto['unidade_infracao']) ? trim($produto['unidade_infracao']) : null;
+                    $tipo_infracao = isset($produto['tipo_infracao']) ? trim($produto['tipo_infracao']) : null;
+                    $marca_infracao = isset($produto['marca_infracao']) ? trim($produto['marca_infracao']) : null;
+                    $obs_infracao = isset($produto['obs_infracao']) ? trim($produto['obs_infracao']) : null;
+
+                    if (!empty($produto_infracao)) {
+                        $stmt->bindParam(':comercio_id', $comercio_id, PDO::PARAM_INT);
+                        $stmt->bindParam(':data_hora_infracao', $data_hora_infracao, PDO::PARAM_STR);
+                        $stmt->bindParam(':estadoIdSelecionado_infracao', $estadoIdSelecionado_infracao, PDO::PARAM_INT);
+                        $stmt->bindParam(':cidade_infracao', $cidade_infracao, PDO::PARAM_STR);
+                        $stmt->bindParam(':produto_infracao', $produto_infracao, PDO::PARAM_STR);
+                        $stmt->bindParam(':qtdApreensao_infracao', $qtdApreensao_infracao, PDO::PARAM_STR);
+                        $stmt->bindParam(':unidade_infracao', $unidade_infracao, PDO::PARAM_STR);
+                        $stmt->bindParam(':tipo_infracao', $tipo_infracao, PDO::PARAM_STR);
+                        $stmt->bindParam(':marca_infracao', $marca_infracao, PDO::PARAM_STR);
+                        $stmt->bindParam(':obs_infracao', $obs_infracao, PDO::PARAM_STR);
+                        $stmt->execute();
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+function gerarPDFListaInfracao($dados) {
+    // Instanciando a classe FPDF
+    $pdf = new FPDF();
+
+    foreach ($dados['listaInfracao'] as $infracao) {
+        $pdf->AddPage();
+        $pdf->SetFont('Times', '', 12);
+
+        // Cabeçalho do termo
+        $pdf->SetFont('Times', '', 14);
+        $pdf->Cell(0, 10, utf8_decode('Anexo "E"'), 0, 1, 'C');
+        $pdf->Cell(0, 10, utf8_decode('Lista de Infrações'), 0, 1, 'C');
+        $pdf->Ln(10);
+
+        // Caminho relativo ao logotipo
+        $logoPath = __DIR__ . '/../../logo.png';
+        if (file_exists($logoPath)) {
+            $pdf->Image($logoPath, ($pdf->GetPageWidth() - 20) / 2, $pdf->GetY(), 20);
+            $pdf->Ln(30);
+        }
+
+        // Informações institucionais
+        $pdf->SetFont('Times', '', 12);
+        $pdf->Cell(0, 10, utf8_decode('Ministério da Defesa'), 0, 1, 'C');
+        $pdf->Cell(0, 10, utf8_decode('Comando Militar do Sul'), 0, 1, 'C');
+        $pdf->Ln(10);
+
+        // Número do termo
+        $pdf->Cell(0, 10, utf8_decode('Nº ' . $dados['numeroUnico'] . ' / ' . date('d/m/Y') . ' /SFPC/3º GAAAe'), 0, 1, 'C');
+        $pdf->Ln(10);
+
+        // Cabeçalho da tabela
+        $pdf->SetFont('Times', 'B', 12);
+        $pdf->Cell(30, 10, utf8_decode('Data/Hora'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Estado'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Cidade'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Produto'), 1, 0, 'C');
+        $pdf->Cell(20, 10, utf8_decode('Qtd'), 1, 0, 'C');
+        $pdf->Cell(20, 10, utf8_decode('Unidade'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Tipo'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Marca'), 1, 0, 'C');
+        $pdf->Cell(50, 10, utf8_decode('Observação'), 1, 1, 'C');
+
+        $pdf->SetFont('Times', '', 12);
+
+        $qtdProdutos = count($infracao['produtos_infracao']);
+
+        // Primeira linha com os dados gerais
+        $pdf->Cell(30, 10 * $qtdProdutos, utf8_decode($infracao['data_hora_infracao']), 1, 0, 'C');
+        $pdf->Cell(30, 10 * $qtdProdutos, utf8_decode($infracao['estadoIdSelecionado_infracao']), 1, 0, 'C');
+        $pdf->Cell(30, 10 * $qtdProdutos, utf8_decode($infracao['cidade_infracao']), 1, 0, 'C');
+
+        $primeiroProduto = true;
+
+        // Percorre os produtos da infração
+        foreach ($infracao['produtos_infracao'] as $produto) {
+            if (!$primeiroProduto) {
+                // Pula as 3 colunas mescladas nas próximas linhas
+                $pdf->Cell(30, 10, '', 0, 0);
+                $pdf->Cell(30, 10, '', 0, 0);
+                $pdf->Cell(30, 10, '', 0, 0);
+            }
+
+            // Exibe os produtos
+            $pdf->Cell(30, 10, utf8_decode($produto['produto_infracao']), 1, 0, 'C');
+            $pdf->Cell(20, 10, utf8_decode($produto['qtdApreensao_infracao']), 1, 0, 'C');
+            $pdf->Cell(20, 10, utf8_decode($produto['unidade_infracao']), 1, 0, 'C');
+            $pdf->Cell(30, 10, utf8_decode($produto['tipo_infracao']), 1, 0, 'C');
+            $pdf->Cell(30, 10, utf8_decode($produto['marca_infracao']), 1, 0, 'C');
+            $pdf->Cell(50, 10, utf8_decode($produto['obs_infracao']), 1, 1, 'C');
+
+            $primeiroProduto = false;
+        }
+    }
+
+    // Gerando nome do arquivo
+    $timestamp = time();
+    $nomeArquivo = 'lista_infracao_' . $dados['user_id'] . '_' . $timestamp . '.pdf';
+   
+    // Saída do PDF
+    $pdf->Output('F', 'PDF/FormulariosPDF/' . $nomeArquivo);
+    return $nomeArquivo;
+}
+
+// Verificar se 'listaInfracao' foi enviada e se é um JSON válido
+$listaInfracao = isset($_POST['listaInfracao']) ? json_decode($_POST['listaInfracao'], true) : null;
+
+if (is_array($listaInfracao) && !empty($listaInfracao)) {
+    $dadosPDFLista = [
+        'user_id' => $user_id,
+        'numeroUnico' => $numeroUnico,
+        'listaInfracao' => $listaInfracao,
+    ];
+    $nomeArquivoPDFListaInfracao = gerarPDFListaInfracao($dadosPDFLista);
+}
+
+
+
+// Configurar e enviar o e-mail
+$mail = new PHPMailer\PHPMailer\PHPMailer(true);
+try {
+    $mail->isSMTP();
+    $mail->Host = 'mail.florestasenegocios.com.br';  
+    $mail->SMTPAuth = true;
+    $mail->Username = 'sindi@florestasenegocios.com.br';
+    $mail->Password = 'sindi123@A';
+    $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+    $mail->Port = 587;
+
+     $mail->CharSet = 'UTF-8';
+
+    $mail->setFrom('sindi@florestasenegocios.com.br', 'Software Exercito Fiscalizacao');
+    $mail->addAddress($email, $razao_social);
+
+    $mail->isHTML(true);
+    $mail->Subject = 'Confirmação de Cadastro';
+
+    // Corpo do e-mail em HTML com as variáveis corretas
+     $respostaDocumentalHTML = '';
+        for ($i = 0; $i < count($respostaDocumental); $i++) {
+            $respostaObservacoesDocumentalHTML .= '<strong>Resposta Documental:' . ($i + 1) . ':</strong> ' . $respostaDocumental[$i] . '<br />';
+            $respostaObservacoesDocumentalHTML .= '<strong>Observação Documental:' . ($i + 1) . ':</strong> ' . $observacoesDocumental[$i] . '<br /><br />';
+        }
+
+    // Corpo do e-mail em HTML com as variáveis corretas
+     $respostasObservacoesPCEHTML = '';
+     for ($i = 0; $i < count($respostaPce); $i++) {
+         $respostasObservacoesPCEHTML .= '<strong>Resposta Verificação PCE ' . ($i + 1) . ':</strong> ' . $respostaPce[$i] . '<br />';
+         $respostasObservacoesPCEHTML .= '<strong>Observação Verificação PCE ' . ($i + 1) . ':</strong> ' . $observacoesPce[$i] . '<br /><br />';
+     }
+     $respostaObservacoesSegurancaPCEHTML = ''; 
+     for ($i = 0; $i < count($respostaSegurancaPce); $i++) {
+         $respostaObservacoesSegurancaPCEHTML .= '<strong>Resposta Segurança PCE ' . ($i + 1) . ':</strong> ' . $respostaSegurancaPce[$i] . '<br />';
+         $respostaObservacoesSegurancaPCEHTML .= '<strong>Observação Segurança PCE ' . ($i + 1) . ':</strong> ' . $observacoesSegurancaPce[$i] . '<br /><br />';
+     }
+     $respostaObservacoesTransportePCEHTML = '';
+     for ($i = 0; $i < count($respostaTransportePce); $i++) {
+         $respostaObservacoesTransportePCEHTML .= '<strong>Resposta Transporte PCE ' . ($i + 1) . ':</strong> ' . $respostaTransportePce[$i] . '<br />';
+         $respostaObservacoesTransportePCEHTML .= '<strong>Observação Transporte PCE ' . ($i + 1) . ':</strong> ' . $observacoesTransportePce[$i] . '<br /><br />';
+     }
+     $respostaManutencaoArmaFogoHTML = '';
+     for ($i = 0; $i < count($respostaManutencaoArmaFogo); $i++) {
+         $respostaManutencaoArmaFogoHTML .= '<strong>Resposta Manutenção Arma Fogo ' . ($i + 1) . ':</strong> ' . $respostaManutencaoArmaFogo[$i] . '<br />';
+         $respostaManutencaoArmaFogoHTML .= '<strong>Observação Manutenção Arma Fogo ' . ($i + 1) . ':</strong> ' . $observacoesManutencaoArmaFogo[$i] . '<br /><br />';
+     }
+     $placaDocumentacaoVeiculosHTML = '';
+     for ($i = 0; $i < count($placaVeiculo); $i++) {
+         $placaDocumentacaoVeiculosHTML .= '<strong>Placa ' . ($i + 1) . ':</strong> ' . $placaVeiculo[$i] . '<br />';
+         $placaDocumentacaoVeiculosHTML .= '<strong>Documentação ' . ($i + 1) . ':</strong> ' . $documentacaoVeiculo[$i] . '<br /><br />';
+     }
+     $respostaInfracaoHTML = '';
+     for ($i = 0; $i < count($infracao); $i++) {
+         $respostaInfracaoHTML .= '<strong>Houve Infração:' . '</strong> ' . $infracao[$i] . '<br />';
+     }
+
+
+        $mail->Body = "
+            <p>Seu cadastro foi realizado com sucesso! Seguem abaixo os detalhes:</p>
+            <strong>Razao Social:</strong> $razao_social<br />
+            <strong>Nome Fantasia:</strong> $nome_fantasia<br />
+            <strong>Atividade Econômica Principal:</strong> $atividade_eco_principal<br />
+            <strong>TRCR:</strong> $trcr<br />
+            <strong>CNPJ:</strong> $cnpj<br />
+            <strong>Endereço:</strong> $endereco<br />
+            <strong>Telefone:</strong> $telefone<br />
+            <strong>Telefone Residencial:</strong> $telefoneResidencial<br />
+            <strong>Email:</strong> $email<br />
+            <strong>Data:</strong> $data<br />
+            <strong>Referência:</strong> $ponto_referencia<br />
+            <strong>Coordenada:</strong> $coordenada<br /><br />
+
+            $respostaObservacoesDocumentalHTML
+
+            $respostasObservacoesPCEHTML
+
+            $respostaObservacoesSegurancaPCEHTML
+
+            $respostaObservacoesTransportePCEHTML
+            $placaDocumentacaoVeiculosHTML
+
+            $respostaManutencaoArmaFogoHTML
+
+            <strong>Lista Deficiência:</strong> $lista_deficiencia<br /><br />
+
+            <strong>Observações Gerais:</strong> $observacoes_gerais<br />
+            $respostaInfracaoHTML
+            <strong>Qts Autos de Infração:</strong> $qtd_autos_infracao<br />
+            <strong>Qtd Termos de Apreensão:</strong> $qtd_termos_aprensao<br />
+            <strong>Qtd Termos Depositário:</strong> $qtd_termos_depositario<br /><br />
+
+            <strong>Especificação de Deficiências:</strong> $especificar_deficiencias<br />
+            <strong>Prazo de Correção de Deficiências:</strong> $prazo_deficiencias<br /><br />
+
+            <strong>Nome Fiscal Militar:</strong> $nome_fiscal_militar<br />
+            <strong>Posto de Graduação:</strong> $fiscal_pg<br />
+            <strong>Idt Militar:</strong> $idtmilitar<br />
+            <strong>Om Militar:</strong> $ommilitar<br /><br />
+
+            <strong>Nome Empresa:</strong> $nome_empresa<br />
+            <strong>CPF Empresa:</strong> $cpf_empresa<br /><br />
+
+            <strong>Testemunha1:</strong> $testemunha1<br />
+            <strong>Itd Testemunha1:</strong> $itdtestemunha1<br /><br />
+
+            <strong>Testemunha2:</strong> $testemunha2<br />
+            <strong>Itd Testemunha2:</strong> $itdtestemunha2<br /><br />
+            <p><em>Você não precisa responder a este e-mail.</em></p>
+            <p><a href='https://woodexport.com.br/turmati/brian/aplicativo/FormFiscalizacao/PDF/FormulariosPDF/$nomeArquivoPDF'>Baixe seu PDF aqui</a></p>
+            <p><a href='https://woodexport.com.br/turmati/brian/aplicativo/FormFiscalizacao/PDF/FormulariosPDF/$nomeArquivoPDFLista'>Baixe seu PDF de Apreensão aqui</a></p>
+            <p><a href='https://woodexport.com.br/turmati/brian/aplicativo/FormFiscalizacao/PDF/FormulariosPDF/$nomeArquivoPDFListaInfracao'>Baixe seu PDF de Apreensão aqui</a></p>
+            ";
+
+
+        // Enviar o e-mail antes de retornar a resposta
+        if ($mail->send()) {
+            echo json_encode(["status" => "success", "message" => "Cadastro bem-sucedido. Confirmação enviada por e-mail."]);
+        } else {
+            error_log('Erro ao enviar e-mail: ' . $mail->ErrorInfo);
+            echo json_encode(["status" => "error", "message" => "Cadastro bem-sucedido, mas erro ao enviar o e-mail."]);
+        }
+    } catch (Exception $e) {
+        error_log('Erro ao enviar e-mail: ' . $mail->ErrorInfo);
+        echo json_encode(["status" => "error", "message" => "Erro ao enviar o e-mail: " . $e->getMessage()]);
+    }
+
+    } catch (PDOException $e) {
+        echo json_encode(["status" => "error", "message" => "Erro na conexão com o banco de dados: " . $e->getMessage()]);
+    }
+
+}catch(Exception $ex){
+    echo json_encode(["status" => "error", "message" => "Erro ao verificar o token: " . $e->getMessage()]);
+}

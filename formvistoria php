@@ -1086,8 +1086,296 @@ for ($i = 0; $i < count($infracao); $i++) {
     $smtpinfracao->bindValue(':infracao', $infracao[$i]);
     $smtpinfracao->execute();
 }
-    //Comentario só para dizer que eu é SEXTA-FEIRA
+$listaApreensao = isset($_POST['listaApreensao']) ? json_decode($_POST['listaApreensao'], true) : null;
 
+if (!is_array($listaApreensao) || empty($listaApreensao)) {
+    error_log("Nenhuma apreensão enviada ou JSON inválido.");
+} else {
+    // Preparar a query de inserção
+    $stmt = $conexao->prepare("INSERT INTO comercio_apreensao (comercio_id, data_hora, estadoIdSelecionado, cidade, produto, qtdApreensao, unidade, tipo, marca, obs)
+                               VALUES (:comercio_id, :data_hora, :estadoIdSelecionado, :cidade, :produto, :qtdApreensao, :unidade, :tipo, :marca, :obs)");
+
+    foreach ($listaApreensao as $apreensao) {
+        $data_hora = isset($apreensao['data_hora']) ? trim($apreensao['data_hora']) : null;
+        $estadoIdSelecionado = isset($apreensao['estadoIdSelecionado']) ? intval($apreensao['estadoIdSelecionado']) : null;
+        $cidade = isset($apreensao['cidade']) ? trim($apreensao['cidade']) : null;
+
+        if (!empty($data_hora) && !empty($estadoIdSelecionado) && !empty($cidade)) {
+            // Agora iteramos sobre a lista de produtos
+            if (!empty($apreensao['produtos']) && is_array($apreensao['produtos'])) {
+                foreach ($apreensao['produtos'] as $produto) {
+                    $produtoNome = isset($produto['produto']) ? trim($produto['produto']) : null;
+                    $qtdApreensao = isset($produto['qtdApreensao']) ? trim($produto['qtdApreensao']) : null;
+                    $unidade = isset($produto['unidade']) ? trim($produto['unidade']) : null;
+                    $tipo = isset($produto['tipo']) ? trim($produto['tipo']) : null;
+                    $marca = isset($produto['marca']) ? trim($produto['marca']) : null;
+                    $obs = isset($produto['obs']) ? trim($produto['obs']) : null;
+
+                    if (!empty($produtoNome)) {
+                        $stmt->bindParam(':comercio_id', $comercio_id, PDO::PARAM_INT);
+                        $stmt->bindParam(':data_hora', $data_hora, PDO::PARAM_STR);
+                        $stmt->bindParam(':estadoIdSelecionado', $estadoIdSelecionado, PDO::PARAM_INT);
+                        $stmt->bindParam(':cidade', $cidade, PDO::PARAM_STR);
+                        $stmt->bindParam(':produto', $produtoNome, PDO::PARAM_STR);
+                        $stmt->bindParam(':qtdApreensao', $qtdApreensao, PDO::PARAM_STR);
+                        $stmt->bindParam(':unidade', $unidade, PDO::PARAM_STR);
+                        $stmt->bindParam(':tipo', $tipo, PDO::PARAM_STR);
+                        $stmt->bindParam(':marca', $marca, PDO::PARAM_STR);
+                        $stmt->bindParam(':obs', $obs, PDO::PARAM_STR);
+                        $stmt->execute();
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+function gerarPDFListaApreensao($dados) {
+    // Instanciando a classe FPDF
+    $pdf = new FPDF();
+
+    foreach ($dados['listaApreensao'] as $apreensao) {
+        $pdf->AddPage();
+        $pdf->SetFont('Times', '', 12);
+
+        // Cabeçalho do termo
+        $pdf->SetFont('Times', '', 14);
+        $pdf->Cell(0, 10, utf8_decode('Anexo "D"'), 0, 1, 'C');
+        $pdf->Cell(0, 10, utf8_decode('Lista de Apreensão'), 0, 1, 'C');
+        $pdf->Ln(10);
+
+        // Caminho relativo ao logotipo
+        $logoPath = __DIR__ . '/../../logo.png';
+        if (file_exists($logoPath)) {
+            $pdf->Image($logoPath, ($pdf->GetPageWidth() - 20) / 2, $pdf->GetY(), 20);
+            $pdf->Ln(30);
+        }
+
+        // Informações institucionais
+        $pdf->SetFont('Times', '', 12);
+        $pdf->Cell(0, 10, utf8_decode('Ministério da Defesa'), 0, 1, 'C');
+        $pdf->Cell(0, 10, utf8_decode('Comando Militar do Sul'), 0, 1, 'C');
+        $pdf->Ln(10);
+
+        // Número do termo
+        $pdf->Cell(0, 10, utf8_decode('Nº ' . $dados['numeroUnico'] . ' / ' . date('d/m/Y') . ' /SFPC/3º GAAAe'), 0, 1, 'C');
+        $pdf->Ln(10);
+
+        // Cabeçalho da tabela
+        $pdf->SetFont('Times', 'B', 12);
+        $pdf->Cell(30, 10, utf8_decode('Data/Hora'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Estado'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Cidade'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Produto'), 1, 0, 'C');
+        $pdf->Cell(20, 10, utf8_decode('Qtd'), 1, 0, 'C');
+        $pdf->Cell(20, 10, utf8_decode('Unidade'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Tipo'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Marca'), 1, 0, 'C');
+        $pdf->Cell(50, 10, utf8_decode('Observação'), 1, 1, 'C');
+
+        $pdf->SetFont('Times', '', 12);
+
+        $qtdProdutos = count($apreensao['produtos']); // Conta os produtos deste termo
+
+        // Primeira linha com os dados gerais
+        $pdf->Cell(30, 10 * $qtdProdutos, utf8_decode($apreensao['data_hora']), 1, 0, 'C');
+        $pdf->Cell(30, 10 * $qtdProdutos, utf8_decode($apreensao['estadoIdSelecionado']), 1, 0, 'C');
+        $pdf->Cell(30, 10 * $qtdProdutos, utf8_decode($apreensao['cidade']), 1, 0, 'C');
+
+        $primeiroProduto = true;
+
+        // Percorre os produtos da apreensão
+        foreach ($apreensao['produtos'] as $produto) {
+            if (!$primeiroProduto) {
+                // Pula as 3 colunas mescladas nas próximas linhas
+                $pdf->Cell(30, 10, '', 0, 0);
+                $pdf->Cell(30, 10, '', 0, 0);
+                $pdf->Cell(30, 10, '', 0, 0);
+            }
+
+            // Exibe os produtos
+            $pdf->Cell(30, 10, utf8_decode($produto['produto']), 1, 0, 'C');
+            $pdf->Cell(20, 10, utf8_decode($produto['qtdApreensao']), 1, 0, 'C');
+            $pdf->Cell(20, 10, utf8_decode($produto['unidade']), 1, 0, 'C');
+            $pdf->Cell(30, 10, utf8_decode($produto['tipo']), 1, 0, 'C');
+            $pdf->Cell(30, 10, utf8_decode($produto['marca']), 1, 0, 'C');
+            $pdf->Cell(50, 10, utf8_decode($produto['obs']), 1, 1, 'C');
+
+            $primeiroProduto = false;
+        }
+    }
+
+    // Gerando nome do arquivo
+    $timestamp = time();
+    $nomeArquivo = 'lista_apreensao_' . $dados['user_id'] . '_' . $timestamp . '.pdf';
+   
+    // Saída do PDF
+    $pdf->Output('F', 'PDF/FormulariosPDF/' . $nomeArquivo);
+    return $nomeArquivo;
+}
+
+
+
+
+// Verificar se 'listaApreensao' foi enviada e se é um JSON válido
+$listaApreensao = isset($_POST['listaApreensao']) ? json_decode($_POST['listaApreensao'], true) : null;
+
+if (is_array($listaApreensao) && !empty($listaApreensao)) {
+    $dadosPDFLista = [
+        'user_id' => $user_id,
+        'numeroUnico' => $numeroUnico,
+        'listaApreensao' => $listaApreensao,
+    ];
+    $nomeArquivoPDFLista = gerarPDFListaApreensao($dadosPDFLista);
+}
+
+
+// Infracao
+$listaInfracao = isset($_POST['listaInfracao']) ? json_decode($_POST['listaInfracao'], true) : null;
+
+if (!is_array($listaInfracao) || empty($listaInfracao)) {
+    error_log("Nenhuma infração enviada ou JSON inválido.");
+} else {
+    // Preparar a query de inserção
+    $stmt = $conexao->prepare("INSERT INTO comercio_infracao
+        (comercio_id, data_hora_infracao, estadoIdSelecionado_infracao, cidade_infracao,
+        produto_infracao, qtdApreensao_infracao, unidade_infracao, tipo_infracao, marca_infracao, obs_infracao)
+        VALUES
+        (:comercio_id, :data_hora_infracao, :estadoIdSelecionado_infracao, :cidade_infracao,
+        :produto_infracao, :qtdApreensao_infracao, :unidade_infracao, :tipo_infracao, :marca_infracao, :obs_infracao)");
+
+    foreach ($listaInfracao as $infracao) {
+        $data_hora_infracao = isset($infracao['data_hora_infracao']) ? trim($infracao['data_hora_infracao']) : null;
+        $estadoIdSelecionado_infracao = isset($infracao['estadoIdSelecionado_infracao']) ? intval($infracao['estadoIdSelecionado_infracao']) : null;
+        $cidade_infracao = isset($infracao['cidade_infracao']) ? trim($infracao['cidade_infracao']) : null;
+
+        if (!empty($data_hora_infracao) && !empty($estadoIdSelecionado_infracao) && !empty($cidade_infracao)) {
+            // Agora iteramos sobre a lista de produtos da infração
+            if (!empty($infracao['produtos_infracao']) && is_array($infracao['produtos_infracao'])) {
+                foreach ($infracao['produtos_infracao'] as $produto) {
+                    $produto_infracao = isset($produto['produto_infracao']) ? trim($produto['produto_infracao']) : null;
+                    $qtdApreensao_infracao = isset($produto['qtdApreensao_infracao']) ? trim($produto['qtdApreensao_infracao']) : null;
+                    $unidade_infracao = isset($produto['unidade_infracao']) ? trim($produto['unidade_infracao']) : null;
+                    $tipo_infracao = isset($produto['tipo_infracao']) ? trim($produto['tipo_infracao']) : null;
+                    $marca_infracao = isset($produto['marca_infracao']) ? trim($produto['marca_infracao']) : null;
+                    $obs_infracao = isset($produto['obs_infracao']) ? trim($produto['obs_infracao']) : null;
+
+                    if (!empty($produto_infracao)) {
+                        $stmt->bindParam(':comercio_id', $comercio_id, PDO::PARAM_INT);
+                        $stmt->bindParam(':data_hora_infracao', $data_hora_infracao, PDO::PARAM_STR);
+                        $stmt->bindParam(':estadoIdSelecionado_infracao', $estadoIdSelecionado_infracao, PDO::PARAM_INT);
+                        $stmt->bindParam(':cidade_infracao', $cidade_infracao, PDO::PARAM_STR);
+                        $stmt->bindParam(':produto_infracao', $produto_infracao, PDO::PARAM_STR);
+                        $stmt->bindParam(':qtdApreensao_infracao', $qtdApreensao_infracao, PDO::PARAM_STR);
+                        $stmt->bindParam(':unidade_infracao', $unidade_infracao, PDO::PARAM_STR);
+                        $stmt->bindParam(':tipo_infracao', $tipo_infracao, PDO::PARAM_STR);
+                        $stmt->bindParam(':marca_infracao', $marca_infracao, PDO::PARAM_STR);
+                        $stmt->bindParam(':obs_infracao', $obs_infracao, PDO::PARAM_STR);
+                        $stmt->execute();
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+function gerarPDFListaInfracao($dados) {
+    // Instanciando a classe FPDF
+    $pdf = new FPDF();
+
+    foreach ($dados['listaInfracao'] as $infracao) {
+        $pdf->AddPage();
+        $pdf->SetFont('Times', '', 12);
+
+        // Cabeçalho do termo
+        $pdf->SetFont('Times', '', 14);
+        $pdf->Cell(0, 10, utf8_decode('Anexo "E"'), 0, 1, 'C');
+        $pdf->Cell(0, 10, utf8_decode('Lista de Infrações'), 0, 1, 'C');
+        $pdf->Ln(10);
+
+        // Caminho relativo ao logotipo
+        $logoPath = __DIR__ . '/../../logo.png';
+        if (file_exists($logoPath)) {
+            $pdf->Image($logoPath, ($pdf->GetPageWidth() - 20) / 2, $pdf->GetY(), 20);
+            $pdf->Ln(30);
+        }
+
+        // Informações institucionais
+        $pdf->SetFont('Times', '', 12);
+        $pdf->Cell(0, 10, utf8_decode('Ministério da Defesa'), 0, 1, 'C');
+        $pdf->Cell(0, 10, utf8_decode('Comando Militar do Sul'), 0, 1, 'C');
+        $pdf->Ln(10);
+
+        // Número do termo
+        $pdf->Cell(0, 10, utf8_decode('Nº ' . $dados['numeroUnico'] . ' / ' . date('d/m/Y') . ' /SFPC/3º GAAAe'), 0, 1, 'C');
+        $pdf->Ln(10);
+
+        // Cabeçalho da tabela
+        $pdf->SetFont('Times', 'B', 12);
+        $pdf->Cell(30, 10, utf8_decode('Data/Hora'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Estado'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Cidade'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Produto'), 1, 0, 'C');
+        $pdf->Cell(20, 10, utf8_decode('Qtd'), 1, 0, 'C');
+        $pdf->Cell(20, 10, utf8_decode('Unidade'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Tipo'), 1, 0, 'C');
+        $pdf->Cell(30, 10, utf8_decode('Marca'), 1, 0, 'C');
+        $pdf->Cell(50, 10, utf8_decode('Observação'), 1, 1, 'C');
+
+        $pdf->SetFont('Times', '', 12);
+
+        $qtdProdutos = count($infracao['produtos_infracao']);
+
+        // Primeira linha com os dados gerais
+        $pdf->Cell(30, 10 * $qtdProdutos, utf8_decode($infracao['data_hora_infracao']), 1, 0, 'C');
+        $pdf->Cell(30, 10 * $qtdProdutos, utf8_decode($infracao['estadoIdSelecionado_infracao']), 1, 0, 'C');
+        $pdf->Cell(30, 10 * $qtdProdutos, utf8_decode($infracao['cidade_infracao']), 1, 0, 'C');
+
+        $primeiroProduto = true;
+
+        // Percorre os produtos da infração
+        foreach ($infracao['produtos_infracao'] as $produto) {
+            if (!$primeiroProduto) {
+                // Pula as 3 colunas mescladas nas próximas linhas
+                $pdf->Cell(30, 10, '', 0, 0);
+                $pdf->Cell(30, 10, '', 0, 0);
+                $pdf->Cell(30, 10, '', 0, 0);
+            }
+
+            // Exibe os produtos
+            $pdf->Cell(30, 10, utf8_decode($produto['produto_infracao']), 1, 0, 'C');
+            $pdf->Cell(20, 10, utf8_decode($produto['qtdApreensao_infracao']), 1, 0, 'C');
+            $pdf->Cell(20, 10, utf8_decode($produto['unidade_infracao']), 1, 0, 'C');
+            $pdf->Cell(30, 10, utf8_decode($produto['tipo_infracao']), 1, 0, 'C');
+            $pdf->Cell(30, 10, utf8_decode($produto['marca_infracao']), 1, 0, 'C');
+            $pdf->Cell(50, 10, utf8_decode($produto['obs_infracao']), 1, 1, 'C');
+
+            $primeiroProduto = false;
+        }
+    }
+
+    // Gerando nome do arquivo
+    $timestamp = time();
+    $nomeArquivo = 'lista_infracao_' . $dados['user_id'] . '_' . $timestamp . '.pdf';
+   
+    // Saída do PDF
+    $pdf->Output('F', 'PDF/FormulariosPDF/' . $nomeArquivo);
+    return $nomeArquivo;
+}
+
+// Verificar se 'listaInfracao' foi enviada e se é um JSON válido
+$listaInfracao = isset($_POST['listaInfracao']) ? json_decode($_POST['listaInfracao'], true) : null;
+
+if (is_array($listaInfracao) && !empty($listaInfracao)) {
+    $dadosPDFLista = [
+        'user_id' => $user_id,
+        'numeroUnico' => $numeroUnico,
+        'listaInfracao' => $listaInfracao,
+    ];
+    $nomeArquivoPDFListaInfracao = gerarPDFListaInfracao($dadosPDFLista);
+}
     // Configurar e enviar o e-mail
     $mail = new PHPMailer\PHPMailer\PHPMailer(true);
     try {

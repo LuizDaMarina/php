@@ -43,7 +43,7 @@ try {
 
         do{
             $numeroUnico = mt_rand(1000000000,9999999999);
-            $smtp = $conexao->prepare("SELECT COUNT(*) FROM comercio WHERE numero_unico = numero_unico");
+            $smtp = $conexao->prepare("SELECT COUNT(*) FROM vistoriapce WHERE numero_unico = numero_unico");
             $smtp->bindParam(':numero_unico' , $numeroUnico);
             $smtp->execute();
             $existe = $smtp->fetchColumn();
@@ -1092,8 +1092,8 @@ if (!is_array($listaApreensao) || empty($listaApreensao)) {
     error_log("Nenhuma apreensão enviada ou JSON inválido.");
 } else {
     // Preparar a query de inserção
-    $stmt = $conexao->prepare("INSERT INTO comercio_apreensao (comercio_id, data_hora, estadoIdSelecionado, cidade, produto, qtdApreensao, unidade, tipo, marca, obs)
-                               VALUES (:comercio_id, :data_hora, :estadoIdSelecionado, :cidade, :produto, :qtdApreensao, :unidade, :tipo, :marca, :obs)");
+    $stmt = $conexao->prepare("INSERT INTO vistoriapce_apreensao (vistoriapce_id, data_hora, estadoIdSelecionado, cidade, produto, qtdApreensao, unidade, tipo, marca, obs)
+                               VALUES (:vistoriapce_id, :data_hora, :estadoIdSelecionado, :cidade, :produto, :qtdApreensao, :unidade, :tipo, :marca, :obs)");
 
     foreach ($listaApreensao as $apreensao) {
         $data_hora = isset($apreensao['data_hora']) ? trim($apreensao['data_hora']) : null;
@@ -1112,7 +1112,7 @@ if (!is_array($listaApreensao) || empty($listaApreensao)) {
                     $obs = isset($produto['obs']) ? trim($produto['obs']) : null;
 
                     if (!empty($produtoNome)) {
-                        $stmt->bindParam(':comercio_id', $comercio_id, PDO::PARAM_INT);
+                        $stmt->bindParam(':vistoriapce_id', $vistoriapce_id, PDO::PARAM_INT);
                         $stmt->bindParam(':data_hora', $data_hora, PDO::PARAM_STR);
                         $stmt->bindParam(':estadoIdSelecionado', $estadoIdSelecionado, PDO::PARAM_INT);
                         $stmt->bindParam(':cidade', $cidade, PDO::PARAM_STR);
@@ -1238,11 +1238,11 @@ if (!is_array($listaInfracao) || empty($listaInfracao)) {
     error_log("Nenhuma infração enviada ou JSON inválido.");
 } else {
     // Preparar a query de inserção
-    $stmt = $conexao->prepare("INSERT INTO comercio_infracao
-        (comercio_id, data_hora_infracao, estadoIdSelecionado_infracao, cidade_infracao,
+    $stmt = $conexao->prepare("INSERT INTO vistoriapce_infracao
+        (vistoriapce_id, data_hora_infracao, estadoIdSelecionado_infracao, cidade_infracao,
         produto_infracao, qtdApreensao_infracao, unidade_infracao, tipo_infracao, marca_infracao, obs_infracao)
         VALUES
-        (:comercio_id, :data_hora_infracao, :estadoIdSelecionado_infracao, :cidade_infracao,
+        (:vistoriapce_id, :data_hora_infracao, :estadoIdSelecionado_infracao, :cidade_infracao,
         :produto_infracao, :qtdApreensao_infracao, :unidade_infracao, :tipo_infracao, :marca_infracao, :obs_infracao)");
 
     foreach ($listaInfracao as $infracao) {
@@ -1262,7 +1262,7 @@ if (!is_array($listaInfracao) || empty($listaInfracao)) {
                     $obs_infracao = isset($produto['obs_infracao']) ? trim($produto['obs_infracao']) : null;
 
                     if (!empty($produto_infracao)) {
-                        $stmt->bindParam(':comercio_id', $comercio_id, PDO::PARAM_INT);
+                        $stmt->bindParam(':vistoriapce_id', $vistoriapce_id, PDO::PARAM_INT);
                         $stmt->bindParam(':data_hora_infracao', $data_hora_infracao, PDO::PARAM_STR);
                         $stmt->bindParam(':estadoIdSelecionado_infracao', $estadoIdSelecionado_infracao, PDO::PARAM_INT);
                         $stmt->bindParam(':cidade_infracao', $cidade_infracao, PDO::PARAM_STR);

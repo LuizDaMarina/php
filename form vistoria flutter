@@ -1,0 +1,2077 @@
+import 'dart:io';
+import 'package:connectivity/connectivity.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../Api.dart';
+import 'package:signature/signature.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+
+
+class FormVistoriaPce extends StatefulWidget {
+
+  final int user_id;
+  final String session_token;
+  final String idtMilitar;
+  final String omMilitar;
+  final String postoGraduacao;
+
+  FormVistoriaPce({required this.user_id, required this.session_token, required this.idtMilitar, required this.omMilitar, required this.postoGraduacao,});
+
+  @override
+  _FormVistoriaPceState createState() => _FormVistoriaPceState();
+}
+class _FormVistoriaPceState extends State<FormVistoriaPce> {
+
+  // Controladores para os campos de entrada
+  final TextEditingController razaoSocial = TextEditingController();
+  final TextEditingController trcr = TextEditingController();
+  final TextEditingController cnpj = TextEditingController();
+  final TextEditingController endereco = TextEditingController();
+  final TextEditingController telefone = TextEditingController();
+  final TextEditingController telefoneResidencial = TextEditingController();
+  final TextEditingController email = TextEditingController();
+  final TextEditingController data = TextEditingController();
+
+  final TextEditingController idtMilitarController = TextEditingController();
+  final TextEditingController omMilitarController = TextEditingController();
+  final TextEditingController postoGraduacaoController = TextEditingController();
+  //Detonacao_atributos
+
+  List<String?> respostaDocumentacao = [];
+  List<String> observacoes = [];
+  List<String> infracao = [];
+
+  List<String?> campos = [];
+  List<TextEditingController> controladores = [];
+
+  final String b = "b.Serviço de detonação";
+  final String c = "c.Segurança de área";
+  final String d = "d.Segurança de PCE";
+
+  //Detonacao_Deficiencias
+  final TextEditingController lista_deficiencia = TextEditingController();
+
+  final TextEditingController nome_fiscal_militar = TextEditingController();
+  final TextEditingController nome_empresa = TextEditingController();
+  final TextEditingController cpf_empresa = TextEditingController();
+  final TextEditingController testemunha1 = TextEditingController();
+  final TextEditingController idtestemunha1 = TextEditingController();
+  final TextEditingController testemunha2 = TextEditingController();
+  final TextEditingController idtestemunha2 = TextEditingController();
+  //Detonacao_Observacoes_gerais
+  final TextEditingController observacoes_gerais = TextEditingController();
+
+  final TextEditingController qtd_autos_infracao = TextEditingController();
+  final TextEditingController qtd_termos_aprensao = TextEditingController();
+  final TextEditingController qtd_termos_depositario = TextEditingController();
+
+  //Detonacao_Deficiencias_Encontradas
+  final TextEditingController especificar_deficiencias_encontradas = TextEditingController();
+  final TextEditingController prazo_deficiencias = TextEditingController();
+
+  //Atributos de Assinatura
+  late SignatureController _assinatura1;
+  late SignatureController _assinatura2;
+  late SignatureController _assinatura3;
+  late SignatureController _assinatura4;
+
+  List<File?> imagens = [];
+
+  // Controladores para os campos user_id e session_token
+  final TextEditingController userIdController = TextEditingController();
+  final TextEditingController sessionTokenController = TextEditingController();
+
+
+
+
+
+
+  Future<void> _selectImage() async {
+    final ImagePicker _picker = ImagePicker();
+
+    // Seleciona uma imagem da galeria
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      setState(() {
+        imagens.add(File(image.path));  // Adiciona a imagem selecionada à lista
+      });
+    }
+  }
+  var telefoneMask = MaskTextInputFormatter(
+      mask: '(##) #####-####', filter: { "#": RegExp(r'[0-9]')});
+  var coordenadaMask = MaskTextInputFormatter(
+      mask: '##.######, ##.######', filter: { "#": RegExp(r'[0-9]')});
+  var dataMask = MaskTextInputFormatter(
+      mask: '##/##/####', filter: {"#": RegExp(r'[0-9]')});
+  var emailMask = MaskTextInputFormatter(
+      mask: '', filter: {"#": RegExp(r'[a-zA-Z0-9@\.]')});
+  var numeroMask = MaskTextInputFormatter(
+      mask: '###########################################',
+      filter: {"#": RegExp(r'[0-9]')}); // Máscara para números
+  var cnpjMask = MaskTextInputFormatter(
+      mask: '##.###.###/####-##', filter: {"#": RegExp(r'[0-9]')});
+  var cpfMask = MaskTextInputFormatter(
+      mask: '###.###.###-##', filter: {"#": RegExp(r'[0-9]')});
+  var letrasMask = MaskTextInputFormatter(
+      mask: '', filter: {"#": RegExp(r'[A-Za-z]')});
+// Método para enviar assinaturas para o servidor
+  Future<String> converterAssinaturaparaBase64(
+      SignatureController controller) async {
+    final image = await controller.toPngBytes();
+    if (image != null) {
+      return 'data:image/png;base64,' + base64Encode(image);
+    } else {
+      return '';
+    }
+  }
+
+  String getCurrentDateFormatted() {
+    DateTime now = DateTime.now();
+    return DateFormat('dd/MM/yyyy').format(now);
+  }
+  Future<String> converterImagemParaBase64(File imagem) async {
+    if (imagem != null) {
+      List<int> imageBytes = await imagem.readAsBytes();
+      String base64String = base64Encode(imageBytes);
+
+      // Determina o tipo MIME com base na extensão da imagem
+      String mimeType = 'image/png'; // Padrão
+      if (imagem.path.endsWith('.jpg') || imagem.path.endsWith('.jpeg')) {
+        mimeType = 'image/jpeg';
+      } else if (imagem.path.endsWith('.gif')) {
+        mimeType = 'image/gif';
+      }
+
+      return 'data:$mimeType;base64,' + base64String; // Retorna o base64 com o prefixo
+    }
+    return ''; // Caso a imagem seja nula
+  }
+
+  Future<void> enviarDadosFormulario(BuildContext context) async {
+    print("Enviando dados...");
+
+    String urlApi = Api.url;
+    String arquivoJson = "FormFiscalizacao/FormVistoriaPce.php";
+    final url = Uri.parse('$urlApi$arquivoJson');
+
+    // Converter as assinaturas para base64
+    String assinatura1Base64 = await converterAssinaturaparaBase64(_assinatura1);
+    String assinatura2Base64 = await converterAssinaturaparaBase64(_assinatura2);
+    String assinatura3Base64 = await converterAssinaturaparaBase64(_assinatura3);
+    String assinatura4Base64 = await converterAssinaturaparaBase64(_assinatura4);
+
+    // Converter as imagens para Base64 com logs de depuração
+    List<String> imagensBase64 = [];
+    int contador = 1;
+
+    for (var imagem in imagens) {
+      if (imagem != null) {
+        try {
+          List<int> imageBytes = await imagem.readAsBytes();
+          String base64String = base64Encode(imageBytes);
+
+          // Verifique se o Base64 começa com o prefixo correto
+          String mimeType = 'image/png'; // Altere para o tipo de imagem correto, se necessário
+          base64String = 'data:$mimeType;base64,' + base64String;
+
+          imagensBase64.add(base64String);
+
+          // Debug da imagem processada
+          print("Imagem $contador convertida para Base64: ${base64String.substring(0, 100)}..."); // Exibir os primeiros 100 caracteres
+          contador++;
+        } catch (e) {
+          print("Erro ao processar a imagem $contador: $e");
+        }
+      } else {
+        print("Imagem $contador é nula e foi ignorada.");
+        contador++;
+      }
+    }
+
+// Verificar total de imagens convertidas
+    print("Total de imagens processadas: ${imagensBase64.length}");
+
+    // Printando as variáveis para ver o que está sendo enviado
+    print("Assinatura 1 Base64: $assinatura1Base64");
+    print("Assinatura 2 Base64: $assinatura2Base64");
+    print("Assinatura 3 Base64: $assinatura3Base64");
+    print("Assinatura 4 Base64: $assinatura4Base64");
+
+    // Imprimindo todas as imagens em Base64
+    print("Imagens Base64:");
+    for (var imagem in imagensBase64) {
+      print(imagem); // Aqui você pode também limitar a quantidade de prints se as imagens forem grandes.
+    }
+
+    var connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult == ConnectivityResult.none) {
+      // Salvar dados localmente
+      await salvarDadosLocalmente();
+      _showDialog(context, "Dados Salvos Localmente", "Os dados foram salvos localmente.");
+      return;
+    }
+
+    final response = await http.post(
+      url,
+      body: {
+        'user_id': widget.user_id.toString(),
+        'razaoSocial': razaoSocial.text,
+        'email': email.text,
+        'trcr': trcr.text,
+        'endereco': endereco.text,
+        'telefone': telefone.text,
+        'telefoneResidencial': telefoneResidencial.text,
+        'cnpj': cnpj.text,
+        'respostaDocumentacao': jsonEncode(respostaDocumentacao),
+        'observacoes': jsonEncode(observacoes),
+        'data': data.text,
+        'lista_deficiencia': lista_deficiencia.text,
+        'observacoes_gerais': observacoes_gerais.text,
+        'infracao': jsonEncode(infracao),
+        'qtd_autos_infracao': qtd_autos_infracao.text,
+        'qtd_termos_aprensao': qtd_termos_aprensao.text,
+        'qtd_termos_depositario': qtd_termos_depositario.text,
+        'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas.text,
+        'prazo_deficiencias': prazo_deficiencias.text,
+        'nome_fiscal_militar': nome_fiscal_militar.text,
+        'fiscal_pg': postoGraduacaoController.text,
+        'idtmilitar': idtMilitarController.text,
+        'ommilitar': omMilitarController.text,
+        'nome_empresa': nome_empresa.text,
+        'cpf_empresa': cpf_empresa.text,
+        'testemunha1': testemunha1.text,
+        'idtestemunha1': idtestemunha1.text,
+        'testemunha2': testemunha2.text,
+        'idtestemunha2': idtestemunha2.text,
+        'assinatura1': assinatura1Base64,
+        'assinatura2': assinatura2Base64,
+        'assinatura3': assinatura3Base64,
+        'assinatura4': assinatura4Base64,
+        'imagens': jsonEncode(imagensBase64),
+      },
+    );
+
+    print("Status da resposta: ${response.statusCode}");
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      if (responseData['status'] == 'success') {
+        _showDialog(context, "Sucesso", "Cadastro bem-sucedido.");
+      } else {
+        _showDialog(context, "Erro", responseData['message'].toString());
+        print("Erro ao enviar dados: ${responseData['message']}");
+      }
+    } else {
+      _showDialog(context, "Erro de Conexão", "Erro de Conexão com o Servidor");
+    }
+  }
+
+// Método para salvar os dados localmente
+  Future<void> salvarDadosLocalmente() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> dadosLocais = prefs.getStringList('dadosLocais') ?? [];
+
+    // Verifique se as assinaturas são válidas
+    if (_assinatura1 == null || _assinatura2 == null || _assinatura3 == null || _assinatura4 == null) {
+      print("Uma ou mais assinaturas estão nulas.");
+      return; // Retorna se alguma assinatura for nula
+    }
+
+    // Converte assinaturas para base64
+    String assinatura1Base64 = await converterAssinaturaparaBase64(_assinatura1);
+    String assinatura2Base64 = await converterAssinaturaparaBase64(_assinatura2);
+    String assinatura3Base64 = await converterAssinaturaparaBase64(_assinatura3);
+    String assinatura4Base64 = await converterAssinaturaparaBase64(_assinatura4);
+
+    List<String> imagensBase64 = await Future.wait(
+      imagens.map((imagem) => converterImagemParaBase64(imagem!)),
+    );
+    imagensBase64.removeWhere((imagem) => imagem.isEmpty);
+
+    // Cria um mapa com os dados do formulário
+    Map<String, dynamic> dados = {
+      'user_id': widget.user_id.toString(),
+      'razaoSocial': razaoSocial.text,
+      'email': email.text,
+      'trcr': trcr.text,
+      'endereco': endereco.text,
+      'telefone': telefone.text,
+      'telefoneResidencial': telefoneResidencial.text,
+      'cnpj': cnpj.text,
+
+      'respostaDocumentacao': jsonEncode(respostaDocumentacao),
+      'observacoes': jsonEncode(observacoes),
+      'data': data.text.isNotEmpty ? data.text : DateTime.now().toString(),
+      'lista_deficiencia': lista_deficiencia.text,
+      'observacoes_gerais': observacoes_gerais.text,
+      'infracao': jsonEncode(infracao),
+      'qtd_autos_infracao': qtd_autos_infracao.text.isNotEmpty ? qtd_autos_infracao.text : '0',
+      'qtd_termos_aprensao': qtd_termos_aprensao.text.isNotEmpty ? int.tryParse(qtd_termos_aprensao.text)?.toString() ?? '0' : '0',
+      'qtd_termos_depositario': qtd_termos_depositario.text.isNotEmpty ? qtd_termos_depositario.text : '0',
+      'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas.text,
+      'prazo_deficiencias': prazo_deficiencias.text,
+      'nome_fiscal_militar': nome_fiscal_militar.text,
+      'postoGraduacaoController': postoGraduacaoController.text,
+      'idtMilitarController': idtMilitarController.text,
+      'omMilitarController': omMilitarController.text,
+      'nome_empresa': nome_empresa.text,
+      'cpf_empresa': cpf_empresa.text,
+      'testemunha1': testemunha1.text,
+      'idtestemunha1': idtestemunha1.text,
+      'testemunha2': testemunha2.text,
+      'idtestemunha2': idtestemunha2.text,
+      'assinatura1Base64': assinatura1Base64,
+      'assinatura2Base64': assinatura2Base64,
+      'assinatura3Base64': assinatura3Base64,
+      'assinatura4Base64': assinatura4Base64,
+      'imagens': imagensBase64,
+    };
+
+    // Adiciona dados convertidos à lista de dados locais
+    dadosLocais.add(jsonEncode(dados));
+    await prefs.setStringList('dadosLocais', dadosLocais);
+    setState(() {}); // Atualiza o estado imediatamente após salvar
+  }
+
+  // Método para enviar os dados salvos localmente
+  Future<void> enviarDadosSalvosLocalmente(BuildContext context) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> dadosLocais = prefs.getStringList('dadosLocais') ?? [];
+
+    if (dadosLocais.isEmpty) {
+      print("Nenhum dado local encontrado para enviar.");
+      return; // Se não houver dados, não faça nada
+    }
+
+
+    // Limpar dados locais após o envio bem-sucedido de todos os registros
+    await limparDadosLocais();
+  }
+  Future<void> enviarDadosParaServidor(
+      String razaoSocial,
+      String email,
+      String data,
+      String trcr,
+      String endereco,
+      String telefone,
+      String telefoneResidencial,
+      String cnpj,
+      String? respostaDocumentacao,
+      String observacoes,
+      String lista_deficiencia,
+      String nome_fiscal_militar,
+      String postoGraduacaoController, // Novo parâmetro
+      String idtMilitarController, // Novo parâmetro
+      String omMilitarController, // Novo parâmetro
+      String nome_empresa,
+      String cpf_empresa,
+      String observacoes_gerais,
+      String? infracao,
+      String qtd_autos_infracao,
+      String qtd_termos_aprensao,
+      String qtd_termos_depositario,
+      String especificar_deficiencias_encontradas,
+      String prazo_deficiencias,
+      String testemunha1,
+      String idtestemunha1,
+      String testemunha2,
+      String idtestemunha2,
+      String assinatura1Base64,
+      String assinatura2Base64,
+      String assinatura3Base64,
+      String assinatura4Base64,
+      List<String> imagensBase64,
+      ) async {
+
+    String urlApi = Api.url;
+    String arquivoJson = "FormFiscalizacao/FormVistoriaPce.php";
+    final url = Uri.parse('$urlApi/$arquivoJson');
+    print("Dados enviados: APRENNSAOOO 2222 : $qtd_termos_aprensao");
+
+    // Serializar lista de imagens em JSON
+
+    // Debug das imagens antes do envio
+    print("Quantidade de imagens: ${imagensBase64.length}");
+    for (int i = 0; i < imagensBase64.length; i++) {
+      print("Imagem $i: ${imagensBase64[i].substring(0, 100)}...");
+    }
+
+
+    final response = await http.post(
+      url,
+      body: {
+        'user_id': widget.user_id.toString(),
+        'razaoSocial': razaoSocial,
+        'email': email,
+        'trcr': trcr,
+        'endereco': endereco,
+        'telefone': telefone,
+        'telefoneResidencial': telefoneResidencial,
+        'cnpj': cnpj,
+        'respostaDocumentacao': respostaDocumentacao ?? '',
+        'observacoes': observacoes,
+        'data': data,
+        'lista_deficiencia': lista_deficiencia,
+        'observacoes_gerais': observacoes_gerais,
+
+        'infracao': infracao ?? '',
+
+        'qtd_autos_infracao': qtd_autos_infracao, // Novo parâmetro
+        'qtd_termos_aprensao': qtd_termos_aprensao, // Novo parâmetro
+        'qtd_termos_depositario': qtd_termos_depositario, // Novo parâmetro
+        'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas, // Novo parâmetro
+        'prazo_deficiencias': prazo_deficiencias, // Novo parâmetro
+        'nome_fiscal_militar': nome_fiscal_militar, // Novo parâmetro
+        'fiscal_pg': postoGraduacaoController, // Novo parâmetro
+        'idtmilitar': idtMilitarController,
+        'ommilitar': omMilitarController, // Novo parâmetro
+        'nome_empresa': nome_empresa, // Novo parâmetro
+        'cpf_empresa': cpf_empresa, // Novo parâmetro
+        'testemunha1': testemunha1, // Novo parâmetro
+        'idtestemunha1': idtestemunha1, // Novo parâmetro
+        'testemunha2': testemunha2, // Novo parâmetro
+        'idtestemunha2': idtestemunha2, // Novo parâmetro
+
+        'assinatura1': assinatura1Base64,
+        'assinatura2': assinatura2Base64,
+        'assinatura3': assinatura3Base64,
+        'assinatura4': assinatura4Base64,
+
+        'imagens': jsonEncode(imagensBase64),
+      },
+    );
+
+    print("Dados enviados: APRENNSAOOO: $qtd_termos_aprensao");
+
+    print("Status da resposta: ${response.statusCode}");
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      print("Resposta do servidor: $responseData");
+
+      if (responseData['status'] == 'success') {
+        _showDialog(context, "Sucesso", "Cadastro bem-sucedido.");
+        await removerRegistroLocal(jsonEncode({'razaoSocial': razaoSocial, 'email': email}));
+      } else {
+        _showDialog(context, "Erro", responseData['message']);
+      }
+    } else {
+      _showDialog(context, "Erro de Conexão", "Erro de Conexão com o Servidor");
+    }
+  }
+
+// Método para limpar os dados salvos localmente
+  Future<void> limparDadosLocais() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.remove('dadosLocais'); // Limpa todos os dados salvos
+  }
+
+  Future<List<String>> carregarDadosLocais() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> dadosLocais = prefs.getStringList('dadosLocais') ?? [];
+
+    // Debug: verificar quantos dados locais existem
+    print("Dados locais carregados: ${dadosLocais.length}");
+
+    List<String> imagensBase64 = [];
+
+    for (String dado in dadosLocais) {
+      try {
+        // Decodificar o dado para um Map
+        Map<String, dynamic> dadosMap = jsonDecode(dado);
+
+        // Verificando se 'imagensBase64' ou 'baseImagensBase64' existe e imprimindo o tipo
+        if (dadosMap.containsKey('imagensBase64')) {
+          imagensBase64 = List<String>.from(dadosMap['imagensBase64']);
+          print("Imagens armazenadas em 'imagensBase64'. Número de imagens: ${imagensBase64.length}");
+        } else if (dadosMap.containsKey('baseImagensBase64')) {
+          imagensBase64 = List<String>.from(dadosMap['baseImagensBase64']);
+          print("Imagens armazenadas em 'baseImagensBase64'. Número de imagens: ${imagensBase64.length}");
+        } else {
+          print("Nenhuma imagem encontrada nos dados locais.");
+        }
+
+        // Aqui você pode adicionar mais verificações ou transformações nos dados
+
+      } catch (e) {
+        print("Erro ao decodificar dados locais: $e");
+      }
+    }
+
+    return dadosLocais;
+  }
+// Método para remover registro local
+  Future<void> removerRegistroLocal(String dados) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> dadosLocais = prefs.getStringList('dadosLocais') ?? [];
+
+    // Apenas remove o registro específico que foi enviado
+    dadosLocais.removeWhere((registro) => registro == dados);
+
+    await prefs.setStringList('dadosLocais', dadosLocais);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Adicionar um listener para verificar a conexão
+    Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
+      if (result == ConnectivityResult.mobile || result == ConnectivityResult.wifi) {
+        // Enviar os dados salvos localmente quando a conexão é restaurada
+        enviarDadosSalvosLocalmente(context);
+      }
+    });
+
+    // Carregar os dados locais
+    carregarDadosLocais();
+    // Obtém a localização assim que a tela for carregada
+    _assinatura1 = SignatureController(penStrokeWidth: 2, penColor: Colors.black);
+    _assinatura2 = SignatureController(penStrokeWidth: 2, penColor: Colors.black);
+    _assinatura3 = SignatureController(penStrokeWidth: 2, penColor: Colors.black);
+    _assinatura4 = SignatureController(penStrokeWidth: 2, penColor: Colors.black);
+
+
+    idtMilitarController.text = widget.idtMilitar.toString();
+    omMilitarController.text = widget.omMilitar.toString();
+    postoGraduacaoController.text = widget.postoGraduacao.toString();
+  }
+
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    super.dispose();
+    _assinatura1.dispose();
+    _assinatura2.dispose();
+    _assinatura3.dispose();
+    _assinatura4.dispose();
+    idtMilitarController.dispose();
+    omMilitarController.dispose();
+    postoGraduacaoController.dispose();
+  }
+
+  // Método para exibir diálogos
+  void _showDialog(BuildContext context, String title, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Exposição de PCE"),
+        backgroundColor: Color.fromRGBO(17, 48, 33, 1),
+        iconTheme: IconThemeData(color: Colors.white),
+        titleTextStyle: TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Card(
+                elevation: 4.0,
+                color: Color.fromRGBO(17, 48, 33, 1),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20.0),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(10.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        "Termo de fiscalização para exposição de PCE. ",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 10),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: 20),
+              buildExpansionTile(),
+              SizedBox(height: 20),
+              buildExpansionVerificacaoEmpresaTile(),
+
+
+              SizedBox(height: 20),
+              buildIdentificacaoDeficienciaTile(),
+              SizedBox(height: 20),
+              buildIdentificacaoObservacoesGeraisTile(),
+              SizedBox(height: 20),
+              buildIdentificacaoCorrecaoDeficienciaTile(),
+              SizedBox(height: 20),
+
+              // Adicionando a seção de imagens antes das assinaturas
+              buildImagePicker(),
+              SizedBox(height: 20),
+
+
+              SizedBox(height: 20),
+              Text("Assinaturas"),
+              SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: buildAssinaturaForm("Fiscal Militar", _assinatura1)),
+                  SizedBox(width: 10,),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(child:
+                  buildFormField("Nome:", nome_fiscal_militar),
+                  ),
+                  SizedBox(width: 6,),
+                  Expanded(child:
+                  buildFormField("P/G:", postoGraduacaoController),
+                  ),
+                ],
+              ),
+              SizedBox(height: 6,),
+              Row(
+                children: [
+                  Expanded(child:
+                  buildFormField("Idt Mil:", idtMilitarController),
+                  ),
+                  SizedBox(width: 6,),
+                  Expanded(child:
+                  buildFormField("OM:", omMilitarController),
+                  ),
+                ],
+              ),
+              SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(child: buildAssinaturaForm("Responsável pela Empresa", _assinatura2)),
+                  SizedBox(width: 10,),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(child:
+                  buildFormField("Nome:", nome_empresa),
+                  ),
+                  SizedBox(width: 6,),
+                  Expanded(child:
+                  buildFormFieldComMascara("CPF:", cpf_empresa, cpfMask),
+                  ),
+                ],
+              ),
+              SizedBox(height: 6,),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: buildAssinaturaForm("Testemunha 1", _assinatura3)),
+                  SizedBox(width: 10,),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(child:
+                  buildFormField("Nome:", testemunha1),
+                  ),
+                  SizedBox(width: 6,),
+                  Expanded(child:
+                  buildFormField("Idt:", idtestemunha1),
+                  ),
+                ],
+              ),
+              SizedBox(height: 6,),
+              Row(
+                children: [
+                  Expanded(child: buildAssinaturaForm("Testemunha 2", _assinatura4)),
+                ],
+              ),
+
+              Row(
+                children: [
+                  Expanded(child:
+                  buildFormField("Nome:", testemunha2),
+                  ),
+                  SizedBox(width: 6,),
+                  Expanded(child:
+                  buildFormField("Idt:", idtestemunha2),
+                  ),
+                ],
+              ),
+
+              SizedBox(height: 20,),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    enviarDadosFormulario(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: Colors.green,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10.0),
+                    ),
+                    padding: EdgeInsets.symmetric(vertical: 15.0),
+                  ),
+                  child: Text(
+                    "Salvar dados",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+
+        ),
+
+      ),
+    );
+  }
+  Widget buildCamposDinamicos() {
+    return Container(
+      margin: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.3),
+            spreadRadius: 2,
+            blurRadius: 5,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+    );
+  }
+
+  //Campo para Selecionar as Imagens
+  Widget buildImagePicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Selecione as Imagens",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        SizedBox(height: 10),
+        ElevatedButton(
+          onPressed: _selectImage, // Chama a função para selecionar a imagem
+          child: Text("Selecionar Imagem da Galeria"),
+        ),
+        SizedBox(height: 10),
+        if (imagens.isNotEmpty) // Se houver imagens selecionadas, exibe-as
+          Wrap(
+            spacing: 8.0,
+            children: imagens.map((imagem) {
+              return Stack(
+                children: [
+                  Image.file(
+                    imagem!,
+                    width: 100,
+                    height: 100,
+                    fit: BoxFit.cover,
+                  ),
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: IconButton(
+                      icon: Icon(Icons.delete, color: Colors.red),
+                      onPressed: () {
+                        setState(() {
+                          imagens.remove(imagem); // Remove a imagem da lista
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+      ],
+    );
+  }
+
+  //Formulário para Assinatura Digital
+  Widget buildAssinaturaForm(String title, SignatureController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
+        Signature(
+          controller: controller,
+          height: 100,
+          width: double.infinity,
+          backgroundColor: Colors.grey[200]!,
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(onPressed: (){
+              controller.clear();
+            },
+                child: Text("Limpar")
+            )
+          ],
+        )
+      ],
+    );
+  }
+
+  //Formulário de indentificação do fiscalizado
+  Widget buildExpansionTile() {
+    return FutureBuilder<List<String>>(
+      future: carregarDadosLocais(),
+      builder: (context, snapshot) {
+        bool temDadosNaoSalvos = snapshot.hasData && snapshot.data!.isNotEmpty;
+        String titulo = temDadosNaoSalvos
+            ? "Identificação do Fiscalizado (Registros não enviados)"
+            : "Identificação do Fiscalizado";
+
+        return Container(
+          margin: EdgeInsets.only(bottom: 10.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10.0),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.fromRGBO(243, 243, 243, 1.0),
+                Color.fromRGBO(217, 217, 217, 1.0),
+              ],
+            ),
+          ),
+          child: ExpansionTile(
+            title: Text(
+              titulo,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            children: [
+              if (temDadosNaoSalvos)
+                Column(
+                  children: snapshot.data!.map((dados) {
+                    Map<String, dynamic> dadosMap = jsonDecode(dados);
+                    return ListTile(
+                      title: Text("Registro salvo localmente"),
+                      subtitle: Text(
+                        "Nome: ${dadosMap['nome'] ?? 'N/A'}\n"
+                            "Email: ${dadosMap['email'] ?? 'N/A'}\n"
+                            "Número: ${dadosMap['numero'] ?? 'N/A'}\n"
+                            "Razão Social: ${dadosMap['razaoSocial'] ?? 'N/A'}\n"
+                            "Data: ${dadosMap['data'] ?? 'N/A'}\n"
+                            "TRCR: ${dadosMap['trcr'] ?? 'N/A'}\n"
+                            "Endereço: ${dadosMap['endereco'] ?? 'N/A'}\n"
+                            "Telefone: ${dadosMap['telefone'] ?? 'N/A'}\n"
+                            "Telefone Residencial: ${dadosMap['telefoneResidencial'] ?? 'N/A'}\n"
+                            "CNPJ: ${dadosMap['cnpj'] ?? 'N/A'}\n"
+                            "Resposta Documentação: ${dadosMap['respostaDocumentacao'] ?? 'N/A'}\n"
+                            "Observações: ${dadosMap['observacoes'] ?? 'N/A'}\n"
+                            "Lista Deficiência: ${dadosMap['lista_deficiencia'] ?? 'N/A'}\n"
+                            "Observações Gerais: ${dadosMap['observacoes_gerais'] ?? 'N/A'}\n"
+                            "Infração: ${dadosMap['infracao'] ?? 'N/A'}\n"
+                            "Quantidade de Autos de Infração: ${dadosMap['qtd_autos_infracao'] ?? 'N/A'}\n"
+                            "Quantidade de Termos de Apreensão: ${dadosMap['qtd_termos_aprensao'] ?? 'N/A'}\n"
+                            "Quantidade de Termos de Depositário: ${dadosMap['qtd_termos_depositario'] ?? 'N/A'}\n"
+                            "Especificar Deficiências Encontradas: ${dadosMap['especificar_deficiencias_encontradas'] ?? 'N/A'}\n"
+                            "Nome Fiscal Militar: ${dadosMap['nome_fiscal_militar'] ?? 'N/A'}\n"
+                            "CPF Empresa: ${dadosMap['cpf_empresa'] ?? 'N/A'}\n"
+                            "Testemunha 1: ${dadosMap['testemunha1'] ?? 'N/A'}\n"
+                            "ITD : ${dadosMap['idtestemunha1'] ?? 'N/A'}\n"
+                            "Testemunha 2: ${dadosMap['testemunha2'] ?? 'N/A'}\n"
+                            "ITD 2: ${dadosMap['idtestemunha2'] ?? 'N/A'}\n"
+                            "Assinatura 1 (Base64): ${dadosMap['assinatura1Base64'] ?? 'N/A'}\n"
+                            "Assinatura 2 (Base64): ${dadosMap['assinatura2Base64'] ?? 'N/A'}\n"
+                            "Assinatura 3 (Base64): ${dadosMap['assinatura3Base64'] ?? 'N/A'}\n"
+                            "Assinatura 4 (Base64): ${dadosMap['assinatura4Base64'] ?? 'N/A'}\n"
+                            "Imagens (Base64):\n" +
+                            "Imagens (Base64):\n" +
+                            (dadosMap['imagens'] != null && dadosMap['imagens'] is List
+                                ? List<String>.from(dadosMap['imagens'])
+                                .asMap()
+                                .entries
+                                .map((entry) => "  Imagem ${entry.key + 1}: ${entry.value.substring(0, 100)}...")
+                                .join("\n")
+                                : "Nenhuma imagem disponível.") +
+                            "\n",
+
+
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(Icons.send),
+                        onPressed: () async {
+                          try {
+                            List<String> imagensBase64 = [];
+
+                            // Verifica se 'imagensBase64' existe e é uma lista
+                            if (dadosMap['imagens'] != null && dadosMap['imagens'] is List) {
+                              imagensBase64 = List<String>.from(dadosMap['imagens']);
+
+                              // Adiciona nomes às imagens
+                              imagensBase64 = imagensBase64
+                                  .asMap()
+                                  .entries
+                                  .map((entry) => "Imagem_${entry.key + 1}: ${entry.value}")
+                                  .toList();
+                            }
+
+                            // Debug: Exibe as imagens no console
+                            print("Imagens encontradas para envio:");
+                            imagensBase64.forEach((imagem) {
+                              print(imagem.substring(0, 100)); // Exibe apenas os primeiros 100 caracteres
+                            });
+
+                            // Chama o método que envia os dados para o servidor
+                            await enviarDadosParaServidor(
+                                dadosMap['razaoSocial'] ?? '',
+                                dadosMap['email'] ?? '',
+                                dadosMap['data'] ?? '',
+                                dadosMap['trcr'] ?? '',
+                                dadosMap['endereco'] ?? '',
+                                dadosMap['telefone'] ?? '',
+                                dadosMap['telefoneResidencial'] ?? '',
+                                dadosMap['cnpj'] ?? '',
+                                dadosMap['respostaDocumentacao'] ?? '',
+                                dadosMap['observacoes'] ?? '',
+                                dadosMap['lista_deficiencia'] ?? '',
+                                dadosMap['observacoes_gerais'] ?? '',
+                                dadosMap['infracao'] ?? '',
+                                dadosMap['qtd_autos_infracao']?.isNotEmpty == true ? dadosMap['qtd_autos_infracao'] : '0',
+                                dadosMap['qtd_termos_aprensao']?.isNotEmpty == true ? dadosMap['qtd_termos_aprensao'] : '0',
+                                dadosMap['qtd_termos_depositario']?.isNotEmpty == true ? dadosMap['qtd_termos_depositario'] : '0',
+                                dadosMap['especificar_deficiencias_encontradas'] ?? '',
+                                dadosMap['prazo_deficiencias'] ?? '',
+                                dadosMap['nome_fiscal_militar'] ?? '',dadosMap['postoGraduacaoController'] ?? '',
+                                dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                                dadosMap['omMilitarController'] ?? '',
+                                dadosMap['nome_empresa'] ?? '',
+                                dadosMap['cpf_empresa'] ?? '',
+                                dadosMap['testemunha1'] ?? '',
+                                dadosMap['idtestemunha1'] ?? '',
+                                dadosMap['testemunha2'] ?? '',
+                                dadosMap['idtestemunha2'] ?? '',
+                                dadosMap['assinatura1Base64'] ?? '',
+                                dadosMap['assinatura2Base64'] ?? '',
+                                dadosMap['assinatura3Base64'] ?? '',
+                                dadosMap['assinatura4Base64'] ?? '',
+                                imagensBase64 // Passando as imagens com a chave 'imagens'
+                            );
+
+
+                            // Após o envio, remove o registro local
+                            print("Dados enviados com sucesso! Removendo registro local...");
+                            await removerRegistroLocal(dados);
+                          } catch (error, stackTrace) {
+                            // Em caso de erro, exibe a mensagem e a pilha de erro
+                            print("Erro ao enviar os dados: $error");
+                            print("Detalhes: $stackTrace");
+                          }
+                        },
+                      ),
+
+                    );
+                  }).toList(),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    buildIdentificacaoForm(),
+                    SizedBox(height: 20),
+
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget buildIdentificacaoForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        buildFormFieldComMascara("Razão Social:", razaoSocial, letrasMask),
+        SizedBox(height: 10,),
+        Row(
+          children: [
+            Expanded(
+              flex: 1,
+              child: buildFormFieldComMascara("TR/CR:", trcr, numeroMask),
+            ),
+            SizedBox(width: 10,),
+            Expanded(
+              flex: 1,
+              child: buildFormFieldComMascara("CNPJ:", cnpj, cnpjMask),
+            ),
+          ],
+        ),
+        SizedBox(height: 10,),
+        buildFormFieldComMascara("Endereço:", endereco, letrasMask),
+        SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              flex: 1,
+              child: buildFormFieldComMascara("Tel:", telefone, telefoneMask),
+            ),
+            SizedBox(width: 10,),
+            Expanded(
+              flex: 1,
+              child: buildFormFieldComMascara("Telefone Residencial:", telefoneResidencial, telefoneMask),
+            ),
+            Expanded(
+              flex: 1,
+              child: buildFormFieldComMascara("E-mail:", email, emailMask),
+            ),
+          ],
+        ),
+
+        SizedBox(height: 10),
+        buildFormFieldComMascaraData("Data:", data, dataMask),
+
+
+      ],
+    );
+  }
+
+  //Formulário Verificação da empresa
+  Widget buildExpansionVerificacaoEmpresaTile() {
+    return FutureBuilder<List<String>>(
+      future: carregarDadosLocais(),
+      builder: (context, snapshot) {
+        bool temDadosNaoSalvos = snapshot.hasData && snapshot.data!.isNotEmpty;
+        String titulo = temDadosNaoSalvos
+            ? "Verificação Documental (Registros não enviados)"
+            : "Verificação Documental";
+
+        return Container(
+          margin: EdgeInsets.only(bottom: 10.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10.0),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.fromRGBO(243, 243, 243, 1.0),
+                Color.fromRGBO(217, 217, 217, 1.0),
+              ],
+            ),
+          ),
+          child: ExpansionTile(
+            title: Text(
+              titulo,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            children: [
+              if (temDadosNaoSalvos)
+                Column(
+                  children: snapshot.data!.map((dados) {
+                    Map<String, dynamic> dadosMap = jsonDecode(dados);
+
+                    return ListTile(
+                      title: Text("Registro salvo localmente"),
+                      subtitle: Text(
+                        "Nome: ${dadosMap['nome']}\nEmail: ${dadosMap['email']}\nNúmero: ${dadosMap['numero']}",
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(Icons.send),
+                        onPressed: () async {
+                          List<String> imagensBase64 = dadosMap.containsKey('imagensBase64') && dadosMap['imagensBase64'] is List
+                              ? List<String>.from(dadosMap['imagensBase64'])
+                              : [];
+                          print("Imagens Base64 para envio: ${imagensBase64.length}");
+
+
+                          // Adicionar debug para verificar as imagens recuperadas
+                          print("Imagens recuperadas (Base64): ${imagensBase64.length} imagens.");
+                          for (int i = 0; i < imagensBase64.length; i++) {
+                            print("Imagem $i: ${imagensBase64[i].substring(0, 100)}..."); // Mostra apenas o início da string
+                          }
+
+                          try {
+                            await enviarDadosParaServidor(
+                              dadosMap['razaoSocial'] ?? '',
+                              dadosMap['email'] ?? '',
+                              dadosMap['data'] ?? '',
+                              dadosMap['trcr'] ?? '',
+                              dadosMap['endereco'] ?? '',
+                              dadosMap['telefone'] ?? '',
+                              dadosMap['telefoneResidencial'] ?? '',
+                              dadosMap['cnpj'] ?? '',
+                              dadosMap['respostaDocumentacao'] ?? '',
+                              dadosMap['observacoes'] ?? '',
+                              dadosMap['lista_deficiencia'] ?? '',
+                              dadosMap['observacoes_gerais'] ?? '',
+                              dadosMap['infracao'] ?? '',
+                              dadosMap['qtd_autos_infracao'] ?? '',
+                              dadosMap['qtd_termos_aprensao'] ?? '',
+                              dadosMap['qtd_termos_depositario'] ?? '',
+                              dadosMap['especificar_deficiencias_encontradas'] ?? '',
+                              dadosMap['prazo_deficiencias'] ?? '',
+                              dadosMap['nome_fiscal_militar'] ?? '',
+                              dadosMap['postoGraduacaoController'] ?? '',
+                              dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                              dadosMap['omMilitarController'] ?? '',
+                              dadosMap['nome_empresa'] ?? '',
+                              dadosMap['cpf_empresa'] ?? '',
+                              dadosMap['testemunha1'] ?? '',
+                              dadosMap['idtestemunha1'] ?? '',
+                              dadosMap['testemunha2'] ?? '',
+                              dadosMap['idtestemunha2'] ?? '',
+                              dadosMap['assinatura1Base64'] ?? '',
+                              dadosMap['assinatura2Base64'] ?? '',
+                              dadosMap['assinatura3Base64'] ?? '',
+                              dadosMap['assinatura4Base64'] ?? '',
+                              imagensBase64, // Lista de imagens enviada diretamente
+                            );
+                            await removerRegistroLocal(dados);
+                          } catch (e) {
+                            print("Erro ao enviar os dados: $e");
+                          }
+                        },
+
+                      ),
+                    );
+                  }).toList(),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    buildIdentificacaoEmpresaForm(),
+                    SizedBox(height: 20),
+
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Construindo o formulário
+  Widget buildIdentificacaoEmpresaForm() {
+    List<String> perguntas = [
+      "O Certificado de Registro (CR) da empresa responsável pela exposição está vigente?",
+      /*"Possui a atividade de utilização - demonstração / exposição de arma de fogo apostilada ao CR válido? (Ou do PCE a ser exposto). (Anexo B5 da Port nº 56/COLOG; Nr III do Art 3º da Port no 150/COLOG).",
+      "Possui autorização do SFPC Regional para a realização do evento? (Art. 140 do Dec nº 10.030/2019)",
+          "Existe controle de que todas as empresas envolvidas na exposição possuam atividade de exposição do PCE exposto e GT dos itens a serem expostos, incluindo prévia autorização do SFPC Regional?(Art. 15 do § 1º da Port nº 1.729/Cmt Ex).",
+      "Existe Plano de segurança do evento?",
+      "Existe um responsável pela Segurança do evento/ Plano de segurança?",
+      "Existem: barreiras físicas / sistemas de segurança eletrônicos (alarmes, monitoramento à distância, vigias) / restrição quanto ao acesso de pessoal ao local de armazenagem e guarda dos PCE descritos no Plano de Segurança? ",
+      "Existe local de depósito destinado a armazenagem de PCE compatível com o estoque?",
+          "O Certificado de Registro (CR) da empresa expositora está vigente?",
+      "Possui a atividade de utilização - demonstração / exposição de arma de fogo apostilada ao CR (ou apostilado o material a ser exposto)?",
+      "As Guias de Tráfego (GT) são correspondentes aos PCE expostos?(Parágrafo 2º do Art. 33 do Dec º11.615/2023)",
+      "Apresentou cópias das Notas Fiscais (NF) de entrada/invoice (i) das armas expostas? Para casos de armas importadas - Parágrafo único e nº III do Art. 30 do Decreto nº 10.030/19 e Art. 15 da Port nº 1729- Cmt Ex/19)",
+      "As armas importadas constam no SICOFA? (º VI do Art 55 da Port nº 1729 - Cmt Ex/2019)",
+      "As armas estão desmuniciadas? (Nr VIII do art 2º do Decreto nº 11.615/23)",
+      "As armas estão sem o percussor? (Anexo F Port nº 150 - COLOG/2019)",
+      "As PCE expostos estão inertes? (granadas, morteiros e etc) (Anexo F Port № 150- COLOG/2019)",
+      "As munições estão expostas sem ter contato manual com o público? (Anexo F da Port nº 150 COLOG/2019)",
+      "As quantidades de PCE em exposição estão dentro dos limites das dotações autorizadas no CR?",
+      "Existe local de depósito destinado a armazenagem de PCE compatível com o estoque?",
+      "Existe responsável pelo armazenamento dos PCE ?",
+          "O Certificado de Registro (CR) do Colecionador está vigente? (Art 31 do Dec nº 11.615/2023)",
+      "Possui Guia de Tráfego correspondente aos PCE expostos? (Parágrafo 2º do Art. 33 do Dec nº 11615/2023 e Art. 46 da Port nº 150 COLOG/2019)",
+      "Os PCE expostos estão inertes? (Obs: A arma será considerada inerte a partir da remoção de peça do seu mecanismo de disparo - Anexo F da Port nº 150-COLOG/2019)",
+      "O acervo exposto pertence ao Colecionador?",
+      "Existe local de depósito destinado a armazenagem de PCE compatível com o estoque?",
+      "Existe responsável pelo armazenamento dos PCE ? (Art 8º da Port nº 150 - COLOG/2019)",*/
+
+    ];
+
+    if (respostaDocumentacao.length < perguntas.length) {
+      respostaDocumentacao = List.generate(perguntas.length, (index) => "");
+    }
+    if (observacoes.length < perguntas.length) {
+      observacoes = List.generate(perguntas.length, (index) => "");
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: List.generate(perguntas.length, (index) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text("${index + 1} - ", style: TextStyle(
+                  color: Color.fromRGBO(17, 48, 33, 1),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                )),
+                Expanded(
+                  child: Text(perguntas[index], style: TextStyle(
+                    color: Color.fromRGBO(17, 48, 33, 1),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  )),
+                ),
+              ],
+            ),
+            SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: RadioListTile<String>(
+                    title: Text("Sim"),
+                    value: "Sim",
+                    groupValue: respostaDocumentacao.length > index ? respostaDocumentacao[index] : null,
+                    onChanged: (value) {
+                      setState(() {
+                        if (respostaDocumentacao.length > index) {
+                          respostaDocumentacao[index] = value;
+                        } else {
+                          respostaDocumentacao.add(value);
+                        }
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: RadioListTile<String>(
+                    title: Text("Não"),
+                    value: "Não",
+                    groupValue: respostaDocumentacao.length > index ? respostaDocumentacao[index] : null,
+                    onChanged: (value) {
+                      setState(() {
+                        if (respostaDocumentacao.length > index) {
+                          respostaDocumentacao[index] = value;
+                        } else {
+                          respostaDocumentacao.add(value);
+                        }
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 10),
+            Row(
+              children: [
+                Text("Observação:", style: TextStyle(
+                  color: Color.fromRGBO(17, 48, 33, 1),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                )),
+              ],
+            ),
+            SizedBox(height: 10),
+            buildFormFieldEmpresa(
+                "Detalhes da Observação",
+                observacoes.length > index ? observacoes[index] : '',
+                index, // Passa o index para a função
+                    (String value) { // Garantir que o tipo da função seja String
+                  if (observacoes.length > index) {
+                    observacoes[index] = value;
+                  } else {
+                    observacoes.add(value);
+                  }
+                }
+            ),
+            SizedBox(height: 10),
+          ],
+        );
+      }),
+    );
+  }
+
+  // Função para construir o campo de entrada
+  Widget buildFormFieldEmpresa(String hint, String initialValue, int index, Function(String) onChanged) {
+    return TextField(
+      decoration: InputDecoration(
+        border: OutlineInputBorder(),
+        hintText: hint,
+      ),
+      onChanged: (value) {
+        // Verifica se o campo foi deixado em branco ou não
+        if (value.isEmpty && observacoes.length <= index) {
+          // Se o campo foi deixado em branco, adicione "Não se Aplica"
+          onChanged("Não se Aplica");
+        } else {
+          // Caso contrário, mantém o valor informado
+          onChanged(value);
+        }
+      },
+      controller: TextEditingController(text: initialValue.isEmpty ? "Não se Aplica" : initialValue),
+
+    );
+  }
+  //Formulário Condição Execução
+  Widget buildExpansionCondicaoExecucaoTile() {
+    return FutureBuilder<List<String>>(
+      future: carregarDadosLocais(),
+      builder: (context, snapshot) {
+        bool temDadosNaoSalvos = snapshot.hasData && snapshot.data!.isNotEmpty;
+        String titulo = temDadosNaoSalvos
+            ? "Verificação das Condiçoes de Execução (Registros não enviados)"
+            : "Verificação das Condiçoes de Execução";
+        List<String> imagensBase64 = [];
+        return Container(
+          margin: EdgeInsets.only(bottom: 10.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10.0),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.fromRGBO(243, 243, 243, 1.0),
+                Color.fromRGBO(217, 217, 217, 1.0),
+              ],
+            ),
+          ),
+          child: ExpansionTile(
+            title: Text(
+              titulo,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            children: [
+              if (temDadosNaoSalvos)
+                Column(
+                  children: snapshot.data!.map((dados) {
+                    Map<String, dynamic> dadosMap = jsonDecode(dados);
+                    return ListTile(
+                      title: Text("Registro salvo localmente"),
+                      subtitle: Text(
+                        "Nome: ${dadosMap['nome']}\nEmail: ${dadosMap['email']}\nNúmero: ${dadosMap['numero']}",
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(Icons.send),
+                        onPressed: () async {
+                          List<String> imagensBase64 = List<String>.from(dadosMap['imagensBase64'] ?? []);
+                          await enviarDadosParaServidor(
+                            dadosMap['razaoSocial'] ?? '',
+                            dadosMap['email'] ?? '',
+                            dadosMap['data'] ?? '',
+                            dadosMap['trcr'] ?? '',
+                            dadosMap['endereco'] ?? '',
+                            dadosMap['telefone'] ?? '',
+                            dadosMap['telefoneResidencial'] ?? '',
+                            dadosMap['cnpj'] ?? '',
+                            dadosMap['respostaDocumentacao'] ?? '',
+                            dadosMap['observacoes'] ?? '',
+                            dadosMap['lista_deficiencia'] ?? '',
+                            dadosMap['observacoes_gerais'] ?? '',
+                            dadosMap['infracao'] ?? '',
+                            dadosMap['qtd_autos_infracao'] ?? '', // Novo parâmetro
+                            dadosMap['qtd_termos_aprensao'] ?? '', // Novo parâmetro
+                            dadosMap['qtd_termos_depositario'] ?? '', // Novo parâmetro
+                            dadosMap['especificar_deficiencias_encontradas'] ?? '', // Novo parâmetro
+
+
+
+                            dadosMap['prazo_deficiencias'] ?? '', // Novo parâmetro
+                            dadosMap['nome_fiscal_militar'] ?? '', // Novo parâmetro
+                            dadosMap['postoGraduacaoController'] ?? '',
+                            dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                            dadosMap['omMilitarController'] ?? '',
+                            dadosMap['nome_empresa'] ?? '', // Novo parâmetro
+                            dadosMap['cpf_empresa'] ?? '',
+                            dadosMap['testemunha1'] ?? '', // Novo parâmetro
+                            dadosMap['idtestemunha1'] ?? '',
+                            dadosMap['testemunha2'] ?? '',
+                            dadosMap['idtestemunha2'] ?? '', // Novo parâmetro
+                            dadosMap['assinatura1Base64'] ?? '',
+                            dadosMap['assinatura2Base64'] ?? '',
+                            dadosMap['assinatura3Base64'] ?? '',
+                            dadosMap['assinatura4Base64'] ?? '',
+                            imagensBase64, // Aqui passa a lista de imagens
+
+
+                          );
+                          await removerRegistroLocal(dados);
+
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("a.informações sobre a detonação",
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          decoration: TextDecoration.underline),
+                    ),
+
+                    SizedBox(height: 20,),
+
+
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  // Função auxiliar para construir campos de texto
+  Widget buildFormFieldExecucao(String hint, String initialValue, Function(String) onChanged) {
+    return TextField(
+      decoration: InputDecoration(
+        border: OutlineInputBorder(),
+        hintText: hint,
+      ),
+      onChanged: onChanged,
+      controller: TextEditingController(text: initialValue),
+    );
+  }
+  //Formulário Execução detonação
+
+  //Formulário Lista de defiências encontradas
+  Widget buildIdentificacaoDeficienciaTile() {
+    return FutureBuilder<List<String>>(
+      future: carregarDadosLocais(),
+      builder: (context, snapshot) {
+        bool temDadosNaoSalvos = snapshot.hasData && snapshot.data!.isNotEmpty;
+        String titulo = temDadosNaoSalvos
+            ? "Lista de Deficiências encontradas (Registros não enviados)"
+            : "Lista de Deficiências encontradas";
+        List<String> imagensBase64 = [];
+        return Container(
+          margin: EdgeInsets.only(bottom: 10.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10.0),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.fromRGBO(243, 243, 243, 1.0),
+                Color.fromRGBO(217, 217, 217, 1.0),
+              ],
+            ),
+          ),
+          child: ExpansionTile(
+            title: Text(
+              titulo,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            children: [
+              if (temDadosNaoSalvos)
+                Column(
+                  children: snapshot.data!.map((dados) {
+                    Map<String, dynamic> dadosMap = jsonDecode(dados);
+                    return ListTile(
+                      title: Text("Registro salvo localmente"),
+                      subtitle: Text(
+                        "Nome: ${dadosMap['nome']}\nEmail: ${dadosMap['email']}\nNúmero: ${dadosMap['numero']}",
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(Icons.send),
+                        onPressed: () async {
+                          List<String> imagensBase64 = List<String>.from(dadosMap['imagensBase64'] ?? []);
+
+                          await enviarDadosParaServidor(
+                            dadosMap['razaoSocial'] ?? '',
+                            dadosMap['email'] ?? '',
+                            dadosMap['data'] ?? '',
+                            dadosMap['trcr'] ?? '',
+                            dadosMap['endereco'] ?? '',
+                            dadosMap['telefone'] ?? '',
+                            dadosMap['telefoneResidencial'] ?? '',
+                            dadosMap['cnpj'] ?? '',
+                            dadosMap['respostaDocumentacao'] ?? '',
+                            dadosMap['observacoes'] ?? '',
+                            dadosMap['lista_deficiencia'] ?? '',
+                            dadosMap['observacoes_gerais'] ?? '',
+                            dadosMap['infracao'] ?? '',
+                            dadosMap['qtd_autos_infracao'] ?? '', // Novo parâmetro
+                            dadosMap['qtd_termos_aprensao'] ?? '', // Novo parâmetro
+                            dadosMap['qtd_termos_depositario'] ?? '', // Novo parâmetro
+                            dadosMap['especificar_deficiencias_encontradas'] ?? '', // Novo parâmetro
+                            dadosMap['prazo_deficiencias'] ?? '', // Novo parâmetro
+                            dadosMap['nome_fiscal_militar'] ?? '', // Novo parâmetro
+                            dadosMap['postoGraduacaoController'] ?? '',
+                            dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                            dadosMap['omMilitarController'] ?? '',
+                            dadosMap['nome_empresa'] ?? '', // Novo parâmetro
+                            dadosMap['cpf_empresa'] ?? '',
+                            dadosMap['testemunha1'] ?? '', // Novo parâmetro
+                            dadosMap['idtestemunha1'] ?? '',
+                            dadosMap['testemunha2'] ?? '',
+                            dadosMap['idtestemunha2'] ?? '', // Novo parâmetro
+                            dadosMap['assinatura1Base64'] ?? '',
+                            dadosMap['assinatura2Base64'] ?? '',
+                            dadosMap['assinatura3Base64'] ?? '',
+                            dadosMap['assinatura4Base64'] ?? '',
+                            imagensBase64, // Passando a lista de imagens base64
+
+                          );
+                          await removerRegistroLocal(dados);
+
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Listar as deficiências uma a uma, enumerando-as."),
+                    SizedBox(height: 20,),
+                    buildIdentificacaoDeficienciaForm(),
+                    SizedBox(height: 20,),
+
+
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  //Construindo o formulário
+  Widget buildIdentificacaoDeficienciaForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        buildFormFieldGrande(lista_deficiencia),
+        SizedBox(height: 10,),
+      ],
+    );
+  }
+
+  //Formulário Observações gerais
+  Widget buildIdentificacaoObservacoesGeraisTile() {
+    return FutureBuilder<List<String>>(
+      future: carregarDadosLocais(),
+      builder: (context, snapshot) {
+        bool temDadosNaoSalvos = snapshot.hasData && snapshot.data!.isNotEmpty;
+        String titulo = temDadosNaoSalvos
+            ? "Observações Gerais (Registros não enviados)"
+            : "Observações Gerais";
+        List<String> imagensBase64 = [];
+        return Container(
+          margin: EdgeInsets.only(bottom: 10.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10.0),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.fromRGBO(243, 243, 243, 1.0),
+                Color.fromRGBO(217, 217, 217, 1.0),
+              ],
+            ),
+          ),
+          child: ExpansionTile(
+            title: Text(
+              titulo,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            children: [
+              if (temDadosNaoSalvos)
+                Column(
+                  children: snapshot.data!.map((dados) {
+                    Map<String, dynamic> dadosMap = jsonDecode(dados);
+                    return ListTile(
+                      title: Text("Registro salvo localmente"),
+                      subtitle: Text(
+                        "Nome: ${dadosMap['nome']}\nEmail: ${dadosMap['email']}\nNúmero: ${dadosMap['numero']} \nTermos Apresencao: ${dadosMap['qtd_termos_aprensao']}" ,
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(Icons.send),
+                        onPressed: () async {
+                          List<String> imagensBase64 = List<String>.from(dadosMap['imagensBase64'] ?? []);
+
+                          await enviarDadosParaServidor(
+                            dadosMap['razaoSocial'] ?? '',
+                            dadosMap['email'] ?? '',
+                            dadosMap['data'] ?? '',
+                            dadosMap['trcr'] ?? '',
+                            dadosMap['endereco'] ?? '',
+                            dadosMap['telefone'] ?? '',
+                            dadosMap['telefoneResidencial'] ?? '',
+                            dadosMap['cnpj'] ?? '',
+                            dadosMap['respostaDocumentacao'] ?? '',
+                            dadosMap['observacoes'] ?? '',
+                            dadosMap['lista_deficiencia'] ?? '',
+                            dadosMap['observacoes_gerais'] ?? '',
+                            dadosMap['infracao'] ?? '',
+                            dadosMap['qtd_autos_infracao'] ?? '', // Novo parâmetro
+                            dadosMap['qtd_termos_aprensao'] ?? '', // Novo parâmetro
+                            dadosMap['qtd_termos_depositario'] ?? '', // Novo parâmetro
+                            dadosMap['especificar_deficiencias_encontradas'] ?? '', // Novo parâmetro
+                            dadosMap['prazo_deficiencias'] ?? '', // Novo parâmetro
+
+                            dadosMap['nome_fiscal_militar'] ?? '', // Novo parâmetro
+                            dadosMap['postoGraduacaoController'] ?? '',
+                            dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                            dadosMap['omMilitarController'] ?? '',
+                            dadosMap['nome_empresa'] ?? '', // Novo parâmetro
+                            dadosMap['cpf_empresa'] ?? '',
+                            dadosMap['testemunha1'] ?? '', // Novo parâmetro
+                            dadosMap['idtestemunha1'] ?? '',
+                            dadosMap['testemunha2'] ?? '',
+                            dadosMap['idtestemunha2'] ?? '', // Novo parâmetro
+
+
+                            dadosMap['assinatura1Base64'] ?? '',
+                            dadosMap['assinatura2Base64'] ?? '',
+                            dadosMap['assinatura3Base64'] ?? '',
+                            dadosMap['assinatura4Base64'] ?? '',
+                            imagensBase64, // Passando a lista de imagens base64
+
+                          );
+                          await removerRegistroLocal(dados);
+
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Demais observações e situações identificadas durante a inspeção"),
+                    SizedBox(height: 20,),
+                    buildIdentificacaoObservacoesGeraisForm(),
+                    SizedBox(height: 20,),
+
+
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  //Construindo o formulário
+  Widget buildIdentificacaoObservacoesGeraisForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        buildFormFieldGrande(observacoes_gerais),
+        SizedBox(height: 10,),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Expanded(
+              child: buildIdentificacaoObservacoesGeraisOpcoesForm(),
+            ),
+          ],
+        ),
+        SizedBox(height: 10),
+        Row(
+          children: [
+            Text("Se houve infração, informar:", style: TextStyle(
+              color: Color.fromRGBO(17, 48, 33, 1),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            )),
+          ],
+        ),
+        SizedBox(height: 10),
+        buildFormFieldComMascara("Qnt de Autos de infração:", qtd_autos_infracao, numeroMask),
+        SizedBox(height: 10,),
+        buildFormFieldComMascara("Qnt de termos de apreensão:", qtd_termos_aprensao, numeroMask),
+        SizedBox(height: 10,),
+        buildFormFieldComMascara("Qnt de termos de fiel depositário:", qtd_termos_depositario, numeroMask),
+        SizedBox(height: 10,),
+      ],
+    );
+  }
+  Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
+    List<String> perguntas = [
+      "Houve infração",
+    ];
+    // Verificando se o tamanho da lista de respostas está sincronizado com o número de perguntas
+    if (infracao.length < perguntas.length) {
+      infracao = List.generate(perguntas.length, (index) => "");
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: List.generate(perguntas.length, (index) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    perguntas[index],
+                    style: TextStyle(
+                      color: Color.fromRGBO(17, 48, 33, 1),
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: RadioListTile<String>(
+                    title: Text("Sim"),
+                    value: "Sim",
+                    groupValue: infracao[index],
+                    onChanged: (value) {
+                      setState(() {
+                        infracao[index] = value!;
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: RadioListTile<String>(
+                    title: Text("Não"),
+                    value: "Não",
+                    groupValue: infracao[index],
+                    onChanged: (value) {
+                      setState(() {
+                        infracao[index] = value!;
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 20),
+          ],
+        );
+      }),
+    );
+  }
+
+  Widget buildFormFieldComMascaraData(String labelText, TextEditingController controller, MaskTextInputFormatter mask) {
+// Inicializa o campo com a data atual formatada
+    controller.text = getCurrentDateFormatted(); // Define o valor da data
+
+    return TextFormField(
+      controller: controller,
+      inputFormatters: [mask],
+      decoration: InputDecoration(
+        labelText: labelText,
+        labelStyle: TextStyle(
+          color: Color.fromRGBO(17, 48, 33, 1),
+          fontFamily: 'RobotoMono',
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Color.fromRGBO(17, 48, 33, 1)),
+          borderRadius: BorderRadius.circular(10.0),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Color.fromRGBO(17, 48, 33, 1)),
+          borderRadius: BorderRadius.circular(10.0),
+        ),
+      ),
+      style: TextStyle(color: Color.fromRGBO(17, 48, 33, 1)),
+    );
+  }
+
+  //Formulário Correção de defiências encontradas
+  Widget buildIdentificacaoCorrecaoDeficienciaTile() {
+    return FutureBuilder<List<String>>(
+      future: carregarDadosLocais(),
+      builder: (context, snapshot) {
+        bool temDadosNaoSalvos = snapshot.hasData && snapshot.data!.isNotEmpty;
+        String titulo = temDadosNaoSalvos
+            ? "Correção de deficiências encontradas (Registros não enviados)"
+            : "Correção de deficiências encontradas";
+
+        List<String> imagensBase64 = [];
+
+        return Container(
+          margin: EdgeInsets.only(bottom: 10.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10.0),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.fromRGBO(243, 243, 243, 1.0),
+                Color.fromRGBO(217, 217, 217, 1.0),
+              ],
+            ),
+          ),
+          child: ExpansionTile(
+            title: Text(
+              titulo,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            children: [
+              if (temDadosNaoSalvos)
+                Column(
+                  children: snapshot.data!.map((dados) {
+                    Map<String, dynamic> dadosMap = jsonDecode(dados);
+                    return ListTile(
+                      title: Text("Registro salvo localmente"),
+                      subtitle: Text(
+                        "Nome: ${dadosMap['nome']}\nEmail: ${dadosMap['email']}\nNúmero: ${dadosMap['numero']}",
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(Icons.send),
+                        onPressed: () async {
+                          List<String> imagensBase64 = List<String>.from(dadosMap['imagensBase64'] ?? []);
+
+                          await enviarDadosParaServidor(
+                            dadosMap['razaoSocial'] ?? '',
+                            dadosMap['email'] ?? '',
+                            dadosMap['data'] ?? '',
+                            dadosMap['trcr'] ?? '',
+                            dadosMap['endereco'] ?? '',
+                            dadosMap['telefone'] ?? '',
+                            dadosMap['telefoneResidencial'] ?? '',
+                            dadosMap['cnpj'] ?? '',
+                            dadosMap['respostaDocumentacao'] ?? '',
+                            dadosMap['observacoes'] ?? '',
+                            dadosMap['lista_deficiencia'] ?? '',
+                            dadosMap['observacoes_gerais'] ?? '',
+                            dadosMap['infracao'] ?? '',
+                            dadosMap['qtd_autos_infracao'] ?? '', // Novo parâmetro
+                            dadosMap['qtd_termos_aprensao'] ?? '', // Novo parâmetro
+                            dadosMap['qtd_termos_depositario'] ?? '', // Novo parâmetro
+                            dadosMap['especificar_deficiencias_encontradas'] ?? '', // Novo parâmetro
+
+
+                            dadosMap['nome_fiscal_militar'] ?? '', // Novo parâmetro
+                            dadosMap['postoGraduacaoController'] ?? '',
+                            dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                            dadosMap['omMilitarController'] ?? '',
+                            dadosMap['nome_empresa'] ?? '', // Novo parâmetro
+                            dadosMap['cpf_empresa'] ?? '',
+                            dadosMap['testemunha1'] ?? '', // Novo parâmetro
+                            dadosMap['idtestemunha1'] ?? '',
+                            dadosMap['testemunha2'] ?? '',
+                            dadosMap['idtestemunha2'] ?? '', // Novo parâmetro
+
+
+                            dadosMap['prazo_deficiencias'] ?? '', // Novo parâmetro
+
+                            dadosMap['assinatura1Base64'] ?? '',
+                            dadosMap['assinatura2Base64'] ?? '',
+                            dadosMap['assinatura3Base64'] ?? '',
+                            dadosMap['assinatura4Base64'] ?? '',
+                            imagensBase64, // Passando a lista de imagens base64
+
+                          );
+                          await removerRegistroLocal(dados);
+
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: 10,),
+                    buildIdentificacaoCorrecaoDeficienciaForm(),
+                    SizedBox(height: 20,),
+
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  //Construindo o formulário
+  Widget buildIdentificacaoCorrecaoDeficienciaForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child:
+            Text("Nada a corrigir ou ", style: TextStyle(
+                fontWeight: FontWeight.bold),),
+            ),
+            Expanded(
+              child: buildFormField("", especificar_deficiencias_encontradas),
+            ),
+            Text(" (Especificar) ", style: TextStyle(
+                fontWeight: FontWeight.bold),),
+            SizedBox(width: 1,),
+          ],
+        ),
+        SizedBox(height: 10,),
+        Row(
+          children: [
+            Expanded(child:
+            Text("Fica estabelecido o prazo de", style: TextStyle(
+                fontWeight: FontWeight.bold),
+            ),
+              flex: 3,
+            ),
+            Expanded(
+              child:
+              buildFormField("",prazo_deficiencias),
+              flex: 2,
+            ),
+            Expanded(
+              child:
+              Text(""),
+              flex: 2,
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Expanded(child:
+            Text("dias para que o fiscalizado providencie a correção das deficiências apontadas no item 4. LISTA DE DEFICIÊNCIAS ENCONTRADAS", style: TextStyle(
+                fontWeight: FontWeight.bold),),),
+            SizedBox(height: 10),
+          ],
+        ),
+        SizedBox(height: 10,),
+      ],
+    );
+  }
+
+  //Controllers e Mascaras
+  Widget buildFormField(String labelText, TextEditingController controller) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: labelText,
+        labelStyle: TextStyle(
+          color: Color.fromRGBO(17, 48, 33, 1),
+          fontFamily: 'RobotoMono',
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Color.fromRGBO(17, 48, 33, 1)),
+          borderRadius: BorderRadius.circular(10.0),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Color.fromRGBO(17, 48, 33, 1)),
+          borderRadius: BorderRadius.circular(10.0),
+        ),
+      ),
+      style: TextStyle(color: Color.fromRGBO(17, 48, 33, 1)),
+    );
+  }
+  Widget buildFormFieldGrande(TextEditingController controller) {
+    return TextFormField(
+      controller: controller,
+      maxLines: 4,
+      decoration: InputDecoration(
+        labelStyle: TextStyle(
+          color: Color.fromRGBO(17, 48, 33, 1),
+          fontFamily: 'RobotoMono',
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Color.fromRGBO(17, 48, 33, 1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Color.fromRGBO(17, 48, 33, 1)),
+        ),
+      ),
+      style: TextStyle(color: Color.fromRGBO(17, 48, 33, 1)),
+    );
+  }
+  Widget buildFormFieldComMascara(
+      String labelText, TextEditingController controller, MaskTextInputFormatter mask) {
+    return TextFormField(
+      controller: controller,
+      inputFormatters: [mask],
+      decoration: InputDecoration(
+        labelText: labelText,
+        labelStyle: TextStyle(
+          color: Color.fromRGBO(17, 48, 33, 1),
+          fontFamily: 'RobotoMono',
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Color.fromRGBO(17, 48, 33, 1)),
+          borderRadius: BorderRadius.circular(10.0),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Color.fromRGBO(17, 48, 33, 1)),
+          borderRadius: BorderRadius.circular(10.0),
+        ),
+      ),
+      style: TextStyle(color: Color.fromRGBO(17, 48, 33, 1)),
+    );
+  }
+  
+}

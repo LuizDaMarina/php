@@ -10,7 +10,6 @@ require 'PHPMailer-master/src/SMTP.php';
 require 'PHPMailer-master/src/Exception.php';
 require 'PDF/fpdf.php'; // Incluindo a biblioteca FPDF
 
-/*
 // Obtendo user_id e session_token do POST
 $user_id = $_POST['user_id'] ?? null;
 $session_token = $_POST['session_token'] ?? null;
@@ -19,8 +18,8 @@ $session_token = $_POST['session_token'] ?? null;
 if (!$user_id || !$session_token) {
     echo json_encode(["status" => "error", "message" => "Dados ausentes"]);
     exit;
-}*/
-/*
+}
+
 try {
     $token_result = $conexao->prepare("
         SELECT token, TIMESTAMPDIFF(SECOND, login_time, NOW()) AS session_duration 
@@ -38,25 +37,25 @@ try {
         echo json_encode(["status" => "error", "message" => "Token inválido ou expirado"]);
         exit;
     }
-*/
 
-      // Gera um número aleatório de até 10 caracteres
+    //Gerar Numero Randomico
     function gerarNumeroUnico($conexao) {
-        do {
-            // Gera um número aleatório de até 10 caracteres
-            $numeroUnico = mt_rand(1000000000, 9999999999); 
 
-            // Verifica se já existe no banco
-            $stmt = $conexao->prepare("SELECT COUNT(*) FROM detonacao WHERE numero_unico = :numero_unico");
-            $stmt->bindParam(':numero_unico', $numeroUnico);
-            $stmt->execute();
-            $existe = $stmt->fetchColumn();
-        } while ($existe > 0);
-
-        return $numeroUnico;
+        do{
+            $numeroUnico = mt_rand(1000000000,9999999999);
+            $smtp = $conexao->prepare("SELECT COUNT(*) FROM comercio WHERE numero_unico = numero_unico");
+            $smtp->bindParam(':numero_unico' , $numeroUnico);
+            $smtp->execute();
+            $existe = $smtp->fetchColumn();
+        } 
+        while($existe > 0);
+            return $numeroUnico;
+        
+    
     }
-
     $numeroUnico = gerarNumeroUnico($conexao);
+
+
 function base64paraAssinaturas($base64_string, $output_file) {
     if (!preg_match('/^data:image\/(\w+);base64,/', $base64_string, $type)) {
         throw new Exception('Formato de Base64 inválido');
@@ -78,6 +77,7 @@ function base64paraAssinaturas($base64_string, $output_file) {
     
     return $output_file;
 }
+
 function enviarResposta($status, $message, $dados = null) {
     $response = [
         'status' => $status,
@@ -94,8 +94,7 @@ function enviarResposta($status, $message, $dados = null) {
     exit;
 }
 
-function base64paraImagens($imagensBase64)
-{
+function base64paraImagens($imagensBase64){
  $savedImages = [];
  $errors = [];
 
@@ -131,7 +130,6 @@ function base64paraImagens($imagensBase64)
  ];
 }
 
-
 function gerarPDF($dados) {
     // Instanciando a classe FPDF
     $pdf = new FPDF();
@@ -139,40 +137,57 @@ function gerarPDF($dados) {
     $pdf->SetFont('Arial', '', 12);
 
 
- 
+
     // Caminho relativo ao script
     $logoPath = __DIR__ . '/../../logo.png'; // Volta duas pastas para localizar a imagem
 
     // Verifica se o arquivo existe
     if (file_exists($logoPath)) {
-        $pdf->Image($logoPath, ($pdf->GetPageWidth() - 40) / 2, $pdf->GetY(), 40); // Centraliza o logotipo sei la
+        $pdf->Image($logoPath, ($pdf->GetPageWidth() - 40) / 2, $pdf->GetY(), 40); // Centraliza o logotipo
         $pdf->Ln(50); // Espaçamento após o logotipo
     } else {
         $pdf->Cell(0, 10, utf8_decode('Logotipo não encontrado.'), 0, 1, 'C');
     }
-    
+
     $pdf->Ln(10);
     $pdf->Ln(10);
-
-
 
     // Informações do Ministério da Defesa
-    $pdf->SetFont('Arial', '', 12);
+    $pdf->SetFont('Arial', 'B', 12);
     $pdf->Cell(0, 10, utf8_decode('Ministério da Defesa'), 0, 1, 'C');
     $pdf->Cell(0, 10, utf8_decode('Comando Militar do Sul'), 0, 1, 'C');
     $pdf->Cell(0, 10, utf8_decode('Comando da 3ª Região Militar'), 0, 1, 'C');
     $pdf->Cell(0, 10, utf8_decode('Serviço de Fiscalização de Produtos Controlados'), 0, 1, 'C');
     $pdf->Ln(10);
-    
+
     // Título do termo de fiscalização
-    $pdf->SetFont('Arial', '', 14);
+       $pdf->SetFont('Arial', '', 14);
     $pdf->Cell(0, 10, utf8_decode('Termo de Fiscalização/Vistoria Para Exposição De PCE'), 0, 1, 'C');
     $pdf->Ln(5);
 
-        // Número do termo
-        $pdf->SetFont('Arial', '', 12);
-        $pdf->Cell(0, 10, utf8_decode('Número ______ /SFPC/3GAAE'), 0, 1, 'C');
-        $pdf->Ln(10);
+    // Número do termo, incluindo o número único gerado e a data
+    $pdf->SetFont('Arial', '', 12); // Fonte padrão
+
+    // Calcula o ponto de início centralizado
+    $larguraTotal = $pdf->GetPageWidth();
+    $pdf->SetX(($larguraTotal - 100) / 2); // Reduzindo a largura total ocupada
+
+    // Texto fixo "Número"
+    $pdf->Cell(15, 10, utf8_decode('Nº:'), 0, 0, 'C');
+
+    // Número único em negrito
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(30, 10, utf8_decode($dados['numeroUnico'] . ' / '), 0, 0, 'C');
+
+    // Data atual em negrito
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(25, 10, utf8_decode(date('d/m/Y')), 0, 0, 'C');
+
+    // Texto fixo "/SFPC/3GAAE"
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->Cell(30, 10, utf8_decode('/SFPC/3º GAAAe'), 0, 1, 'C');
+
+    $pdf->Ln(10); // Espaçamento após a linha
     
 $campos = [
     'Razão Social' => $dados ['razaoSocial'],
@@ -183,8 +198,7 @@ $campos = [
     'Telefone' => $dados['telefone'],
     'Telefone Residencial' => $dados['telefoneResidencial'],
     'CNPJ' => $dados['cnpj'],
-    'Referência' => $dados['referencia'],
-    'Coordenada' => $dados['coordenada'],
+    
 ];
     // Título "Identificação do Fiscalizado"
     $pdf->SetFont('Arial', 'B', 14);
@@ -239,18 +253,21 @@ $campos = [
     $pdf->Ln(10); // 2ª quebra
     $pdf->Ln(10); // 3ª quebra
 
-$pdf->SetFont('Arial', 'B', 14);
-$pdf->Cell(0, 10, utf8_decode('Verificação Documental'), 1, 1, 'L');
-$pdf->Ln(2); // Espaço pequeno
+ // Titulo Verificação Documental
+    $pdf->SetFont('Arial', 'B', 14);
+    $pdf->Cell(0, 10, utf8_decode('2.Verificação do Documental'), 0, 1, 'L');
 
-     //Coluna da Verificação
-     $pdf->SetFont('Arial', 'B', 12);
-     $pdf->Cell(20, 10, utf8_decode('N Ordem'), 1, 0, 'C'); // N Ordem
-     $pdf->Cell(60, 10, utf8_decode('Itens A Verificar:'), 1, 0, 'C');
-     $pdf->Cell(20, 10, utf8_decode('SIM'), 1, 0, 'C');
-     $pdf->Cell(20, 10, utf8_decode('NÂO'), 1, 0, 'C');
-     $pdf->Cell(30, 10, utf8_decode('Não se Aplica'), 1, 0, 'C');
-     $pdf->Cell(40, 10, utf8_decode('Observações'), 1, 1, 'C');
+    // Definir título das colunas (Nº Ordem | GERAL | SIM | NÃO | NÃO SE APLICA/OBSERVAÇÕES)
+    $pdf->SetFont('Arial','B', 12);
+
+    // Cabeçalho das colunas
+    $pdf->Cell(15, 10, utf8_decode('Nº'), 1, 0, 'C');
+    $pdf->Cell(60, 10, utf8_decode('GERAL'), 1, 0, 'C');
+    $pdf->Cell(20, 10, utf8_decode('SIM'), 1, 0, 'C');
+    $pdf->Cell(20, 10, utf8_decode('NÃO'), 1, 0, 'C');
+    $pdf->Cell(35, 10, utf8_decode('NÃO SE APLICA'), 1, 0, 'C');
+    $pdf->Cell(40, 10, utf8_decode('OBSERVAÇÕES'), 1, 0, 'C');
+    $pdf->Ln(10);
 
 
 
@@ -261,8 +278,7 @@ $pdf->Ln(2); // Espaço pequeno
     'Endereço' => $dados['Endereço'],
     'Telefone' => $dados['Telefone'],
     'CNPJ' => $dados['CNPJ'],
-    'Referencia' => $dados['Referencia'],
-    'Coordenada' => $dados['Coordenada'],
+    
 
 
 ]*/
@@ -299,17 +315,22 @@ $pdf->Ln(2); // Espaço pequeno
         // Adicione mais perguntas aqui
     ];
   
-    foreach ($dados['respostaDocumentacao'] as $i => $resposta) {
-        $pergunta = $perguntasFixas[$i] ?? 'Pergunta não definida';
-        $observacao = $dados['observacoes'][$i] ?? 'Sem observação';
+ foreach ($dados['respostaDocumentacao'] as $i => $resposta) {
+
+        $pergunta = $perguntasFixasA[$i] ?? 'Pergunta não definida';
+        $observacao = (isset($observacoes[$i]) && trim($observacoes[$i]) !== '') 
+        ? $observacoesDocumental[$i] 
+        : 'S/A';
+        $pdf->SetFont('Arial', '', 12);
 
         // Calcula a altura da célula com base no texto
-        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 60 ? 20 : 10; // Aumenta a altura se necessário
-        $alturaObservacao = $pdf->GetStringWidth($observacao) > 40 ? 20 : 10;
-        $alturaLinha = max($alturaPergunta, $alturaObservacao);
-
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 40 ? 45 : 10;
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 50 ? 55 : 10;
+        $alturaPergunta = $pdf->GetStringWidth($pergunta) > 60 ? 65 : 10;
+        $alturaObservação = $pdf->GetStringWidth($observacao) > 40 ? 20 : 10;
+        $alturaLinha = max($alturaPergunta, $alturaObservação);
         // Número da Ordem
-        $pdf->Cell(20, $alturaLinha, utf8_decode($i + 1), 1, 0, 'C');
+  $pdf->Cell(15, $alturaLinha, utf8_decode($i + 1), 1, 0, 'C');
 
         // Itens a Verificar (mantém altura fixa e evita quebra de linha extra)
         $x = $pdf->GetX();
@@ -533,43 +554,39 @@ $alturaAssinatura = 40;
 $alturaTexto = 8;
 $alturaTotalAssinatura = $alturaAssinatura + (count($assinaturas[0]['campos_extras']) + 1) * $alturaTexto + 10; // Altura total estimada
 
-// Dados das assinaturas
-$assinaturas = [
-    [
-        "titulo" => "Fiscal Militar",
-        
-        "campos_extras" => [
-            "Nome Fiscal Militar" => $dados['nome_fiscal_militar'],
-            "P/G" => $dados['fiscal_pg'],
-            "IDT" => $dados['idtmilitar'],
-            "OM" => $dados['ommilitar']
+ // Dados das assinaturas
+    $assinaturas = [
+        [
+            "titulo" => "Fiscal Militar",
+            "nome" => $dados['nome_fiscal_militar'],
+            "campos_extras" => [
+                "P/G" => $dados['fiscal_pg'],
+                "IDT" => $dados['idtmilitar'],
+                "OM" => $dados['ommilitar']
+            ]
+        ],
+        [
+            "titulo" => "Responsável Empresa",
+            "nome" => $dados['nome_empresa'],
+            "campos_extras" => [
+                "CPF" => $dados['cpf_empresa']
+            ]
+        ],
+        [
+            "titulo" => "Testemunha 1",
+            "nome" => $dados['testemunha1'],
+            "campos_extras" => [
+                "IDT" => $dados['idtestemunha1']
+            ]
+        ],
+        [
+            "titulo" => "Testemunha 2",
+            "nome" => $dados['testemunha2'],
+            "campos_extras" => [
+                "IDT" => $dados['idtestemunha2']
+            ]
         ]
-    ],
-    [
-        "titulo" => "Responsável Empresa",
-    
-        "campos_extras" => [
-            "Nome" => $dados['nome_empresa'],
-            "CPF" => $dados['cpf_empresa']
-        ]
-    ],
-    [
-        "titulo" => "Testemunha 1",
-        
-        "campos_extras" => [
-            "Nome" => $dados['testemunha1'],
-            "IDT" => $dados['idtestemunha1']
-        ]
-    ],
-    [
-        "titulo" => "Testemunha 2",
-
-        "campos_extras" => [
-            "Nome" => $dados['testemunha2'],
-            "IDT" => $dados['idtestemunha2']
-        ]
-    ]
-];
+    ];
 // Processando assinaturas
 foreach ($assinaturas as $i => $assinatura) {
     $campoAssinatura = 'assinatura' . ($i + 1);

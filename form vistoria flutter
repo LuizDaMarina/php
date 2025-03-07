@@ -1,7 +1,9 @@
 import 'dart:io';
+
 import 'package:connectivity/connectivity.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'dart:convert';
@@ -10,7 +12,8 @@ import '../../Api.dart';
 import 'package:signature/signature.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class FormVistoriaPce extends StatefulWidget {
 
@@ -20,7 +23,8 @@ class FormVistoriaPce extends StatefulWidget {
   final String omMilitar;
   final String postoGraduacao;
 
-  FormVistoriaPce({required this.user_id, required this.session_token, required this.idtMilitar, required this.omMilitar, required this.postoGraduacao,});
+
+  FormVistoriaPce({required this.user_id, required this.session_token, required this.idtMilitar, required this.omMilitar, required this.postoGraduacao});
 
   @override
   _FormVistoriaPceState createState() => _FormVistoriaPceState();
@@ -36,34 +40,18 @@ class _FormVistoriaPceState extends State<FormVistoriaPce> {
   final TextEditingController telefoneResidencial = TextEditingController();
   final TextEditingController email = TextEditingController();
   final TextEditingController data = TextEditingController();
+  final TextEditingController referencia = TextEditingController();
+  final TextEditingController coordenada = TextEditingController();
+  List<String?> respostaDocumentacao = []; // Lista para armazenar as respostas
+  List<String> observacoes = []; // Lista para armazenar as observações
 
-  final TextEditingController idtMilitarController = TextEditingController();
-  final TextEditingController omMilitarController = TextEditingController();
-  final TextEditingController postoGraduacaoController = TextEditingController();
-  //Detonacao_atributos
-
-  List<String?> respostaDocumentacao = [];
-  List<String> observacoes = [];
   List<String> infracao = [];
 
-  List<String?> campos = [];
-  List<TextEditingController> controladores = [];
 
-  final String b = "b.Serviço de detonação";
-  final String c = "c.Segurança de área";
-  final String d = "d.Segurança de PCE";
-
-  //Detonacao_Deficiencias
+  //_Deficiencias
   final TextEditingController lista_deficiencia = TextEditingController();
 
-  final TextEditingController nome_fiscal_militar = TextEditingController();
-  final TextEditingController nome_empresa = TextEditingController();
-  final TextEditingController cpf_empresa = TextEditingController();
-  final TextEditingController testemunha1 = TextEditingController();
-  final TextEditingController idtestemunha1 = TextEditingController();
-  final TextEditingController testemunha2 = TextEditingController();
-  final TextEditingController idtestemunha2 = TextEditingController();
-  
+  //_Observacoes_gerais
   final TextEditingController observacoes_gerais = TextEditingController();
 
   final TextEditingController qtd_autos_infracao = TextEditingController();
@@ -74,13 +62,27 @@ class _FormVistoriaPceState extends State<FormVistoriaPce> {
   final TextEditingController especificar_deficiencias_encontradas = TextEditingController();
   final TextEditingController prazo_deficiencias = TextEditingController();
 
+  final TextEditingController idtMilitarController = TextEditingController();
+  final TextEditingController omMilitarController = TextEditingController();
+  final TextEditingController postoGraduacaoController = TextEditingController();
+
   //Atributos de Assinatura
   late SignatureController _assinatura1;
   late SignatureController _assinatura2;
   late SignatureController _assinatura3;
   late SignatureController _assinatura4;
 
-// Listas para armazenar os dados dos formulários múltiplos Apreesão
+  //Atributos de Assinatura Fiscal Identidade ....
+  final TextEditingController nome_fiscal_militar = TextEditingController();
+  final TextEditingController nome_empresa = TextEditingController();
+  final TextEditingController cpf_empresa = TextEditingController();
+  final TextEditingController testemunha1 = TextEditingController();
+  final TextEditingController idtestemunha1 = TextEditingController();
+  final TextEditingController testemunha2 = TextEditingController();
+  final TextEditingController idtestemunha2 = TextEditingController();
+
+
+  // Listas para armazenar os dados dos formulários múltiplos Apreesão
   List<TextEditingController> data_hora = [];
   List<TextEditingController> cidade = [];
   List<int?> estadoIdSelecionado = [];
@@ -135,7 +137,8 @@ class _FormVistoriaPceState extends State<FormVistoriaPce> {
 
     for (int i = 0; i < quantidade; i++) {
       apreensoes.add({
-        "data_hora_infracao": TextEditingController(text: getCurrentDateTimeFormatted()),
+        "data_hora_infracao": TextEditingController(
+            text: getCurrentDateTimeFormatted()),
         "estadoIdSelecionado_infracao": null,
         "cidade_infracao": TextEditingController(),
         "produtos": [
@@ -151,6 +154,7 @@ class _FormVistoriaPceState extends State<FormVistoriaPce> {
       });
     }
   }
+
   void adicionarProduto(int indexApreensao) {
     apreensoes[indexApreensao]["produtos"].add({
       "produto_infracao": TextEditingController(),
@@ -161,6 +165,7 @@ class _FormVistoriaPceState extends State<FormVistoriaPce> {
       "obs_infracao": TextEditingController(),
     });
   }
+
   void removerProduto(int indexApreensao, int indexProduto) {
     if (apreensoes[indexApreensao]["produtos"].length > 1) {
       apreensoes[indexApreensao]["produtos"].removeAt(indexProduto);
@@ -190,13 +195,15 @@ class _FormVistoriaPceState extends State<FormVistoriaPce> {
     infracoes.clear();
     for (int i = 0; i < quantidade; i++) {
       infracoes.add({
-        "data_hora_infracao": TextEditingController(text: getCurrentDateTimeFormatted()),
+        "data_hora_infracao": TextEditingController(
+            text: getCurrentDateTimeFormatted()),
         "estadoIdSelecionado_infracao": null,
         "cidade_infracao": TextEditingController(),
         "produtos_infracao": [], // Inicializa como lista vazia
       });
     }
   }
+
 // Método para adicionar um produto na infração
   void adicionarProdutoInfracao(int indexInfracao) {
     setState(() {
@@ -215,6 +222,7 @@ class _FormVistoriaPceState extends State<FormVistoriaPce> {
       });
     });
   }
+
 // Método para remover um produto da infração
   void removerProdutoInfracao(int indexInfracao, int indexProduto) {
     setState(() {
@@ -227,13 +235,100 @@ class _FormVistoriaPceState extends State<FormVistoriaPce> {
 
   List<File?> imagens = [];
 
-  // Controladores para os campos user_id e session_token
-  final TextEditingController userIdController = TextEditingController();
-  final TextEditingController sessionTokenController = TextEditingController();
 
+  // Controlador para o mapa
+  GoogleMapController? mapController;
+  LatLng? selecionarLocal;
+  LatLng? currentLocation;
 
+// Função para abrir o mapa e permitir que o usuário selecione uma coordenada
 
+// Função para obter a localização atual
+  Future<void> _getCurrentLocation() async {
+    PermissionStatus permission = await Permission.location.request();
 
+    if (permission.isGranted) {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      setState(() {
+        currentLocation = LatLng(position.latitude, position.longitude);
+        coordenada.text = '${position.latitude}, ${position
+            .longitude}'; // Preenche automaticamente
+      });
+    } else {
+      print("Permissão negada para acessar a localização.");
+      // Exibe mensagem ou redireciona para as configurações
+    }
+  }
+
+  void abrirMapa() async {
+    await _getCurrentLocation(); // Obtém a localização atual ao abrir o mapa
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            Scaffold(
+              appBar: AppBar(
+                title: Text('Selecione a Coordenada'),
+              ),
+              body: GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: currentLocation ?? LatLng(-23.5505, -46.6333),
+                  // Posição inicial com a localização atual
+                  zoom: 12,
+                ),
+                onMapCreated: (GoogleMapController controller) {
+                  mapController = controller;
+                },
+                onTap: (LatLng position) {
+                  // Isso será acionado ao clicar no mapa (se quiser pode manter)
+                  setState(() {
+                    selecionarLocal = position;
+                  });
+                  coordenada.text =
+                  '${position.latitude}, ${position.longitude}';
+                },
+                onLongPress: (LatLng position) {
+                  // Isso será acionado ao pressionar o mapa por 2 segundos (Long press)
+                  setState(() {
+                    selecionarLocal = position;
+                  });
+                  coordenada.text =
+                  '${position.latitude}, ${position.longitude}';
+                  Navigator.pop(context,
+                      selecionarLocal); // Fecha o mapa e retorna com a coordenada
+                },
+                markers: selecionarLocal != null
+                    ? {
+                  Marker(
+                    markerId: MarkerId('Selecionar'),
+                    position: selecionarLocal!,
+                  )
+                }
+                    : currentLocation != null
+                    ? {
+                  Marker(
+                    markerId: MarkerId('LocalAtual'),
+                    position: currentLocation!,
+                  ),
+                }
+                    : {},
+                myLocationEnabled: true,
+                // Habilita o botão de localização atual
+                myLocationButtonEnabled: true, // Mostra o botão de localização no mapa
+              ),
+            ),
+      ),
+    );
+
+    if (selecionarLocal != null) {
+      // Se o usuário selecionou uma nova posição, as coordenadas serão preenchidas
+      coordenada.text =
+      '${selecionarLocal!.latitude}, ${selecionarLocal!.longitude}';
+    }
+  }
 
 
   Future<void> _selectImage() async {
@@ -244,10 +339,15 @@ class _FormVistoriaPceState extends State<FormVistoriaPce> {
 
     if (image != null) {
       setState(() {
-        imagens.add(File(image.path));  // Adiciona a imagem selecionada à lista
+        imagens.add(File(image.path)); // Adiciona a imagem selecionada à lista
       });
     }
   }
+
+// Adiciona um novo campo de texto
+
+
+  // Máscaras para os campos de entrada
   var telefoneMask = MaskTextInputFormatter(
       mask: '(##) #####-####', filter: { "#": RegExp(r'[0-9]')});
   var coordenadaMask = MaskTextInputFormatter(
@@ -265,6 +365,7 @@ class _FormVistoriaPceState extends State<FormVistoriaPce> {
       mask: '###.###.###-##', filter: {"#": RegExp(r'[0-9]')});
   var letrasMask = MaskTextInputFormatter(
       mask: '', filter: {"#": RegExp(r'[A-Za-z]')});
+
 // Método para enviar assinaturas para o servidor
   Future<String> converterAssinaturaparaBase64(
       SignatureController controller) async {
@@ -276,10 +377,19 @@ class _FormVistoriaPceState extends State<FormVistoriaPce> {
     }
   }
 
+  //Carrega Data e Hora
+  static String getCurrentDateTimeFormatted() {
+    DateTime now = DateTime.now();
+// Formatar para o formato adequado para o MySQL
+    return DateFormat('yyyy-MM-dd HH:mm:ss').format(
+        now); // Ex: 2025-02-19 16:28:18
+  }
+
   String getCurrentDateFormatted() {
     DateTime now = DateTime.now();
     return DateFormat('dd/MM/yyyy').format(now);
   }
+
   Future<String> converterImagemParaBase64(File imagem) async {
     if (imagem != null) {
       List<int> imageBytes = await imagem.readAsBytes();
@@ -293,7 +403,8 @@ class _FormVistoriaPceState extends State<FormVistoriaPce> {
         mimeType = 'image/gif';
       }
 
-      return 'data:$mimeType;base64,' + base64String; // Retorna o base64 com o prefixo
+      return 'data:$mimeType;base64,' +
+          base64String; // Retorna o base64 com o prefixo
     }
     return ''; // Caso a imagem seja nula
   }
@@ -302,20 +413,67 @@ class _FormVistoriaPceState extends State<FormVistoriaPce> {
     print("Enviando dados...");
 
     String urlApi = Api.url;
-    String arquivoJson = "FormFiscalizacao/FormVistoriaPce.php";
+    String arquivoJson = "FormFiscalizacao/FormVistoriaPce.php?user_id=${widget.user_id}&session_token${widget.session_token}";
     final url = Uri.parse('$urlApi$arquivoJson');
 
     // Converter as assinaturas para base64
-    String assinatura1Base64 = await converterAssinaturaparaBase64(_assinatura1);
-    String assinatura2Base64 = await converterAssinaturaparaBase64(_assinatura2);
-    String assinatura3Base64 = await converterAssinaturaparaBase64(_assinatura3);
-    String assinatura4Base64 = await converterAssinaturaparaBase64(_assinatura4);
+    String assinatura1Base64 = await converterAssinaturaparaBase64(
+        _assinatura1);
+    String assinatura2Base64 = await converterAssinaturaparaBase64(
+        _assinatura2);
+    String assinatura3Base64 = await converterAssinaturaparaBase64(
+        _assinatura3);
+    String assinatura4Base64 = await converterAssinaturaparaBase64(
+        _assinatura4);
 
     // Converter as imagens para Base64 com logs de depuração
     List<String> imagensBase64 = [];
-List<Map<String, dynamic>> listaApreensao = [];
+    int contador = 1;
 
-      // Verifique se a lista apreensoes não está vazia
+    for (var imagem in imagens) {
+      if (imagem != null) {
+        try {
+          List<int> imageBytes = await imagem.readAsBytes();
+          String base64String = base64Encode(imageBytes);
+
+          // Verifique se o Base64 começa com o prefixo correto
+          String mimeType = 'image/png'; // Altere para o tipo de imagem correto, se necessário
+          base64String = 'data:$mimeType;base64,' + base64String;
+
+          imagensBase64.add(base64String);
+
+          // Debug da imagem processada
+          print("Imagem $contador convertida para Base64: ${base64String
+              .substring(0, 100)}..."); // Exibir os primeiros 100 caracteres
+          contador++;
+        } catch (e) {
+          print("Erro ao processar a imagem $contador: $e");
+        }
+      } else {
+        print("Imagem $contador é nula e foi ignorada.");
+        contador++;
+      }
+    }
+
+    // Verificar total de imagens convertidas
+    print("Total de imagens processadas: ${imagensBase64.length}");
+
+    // Printando as variáveis para ver o que está sendo enviado
+    print("Assinatura 1 Base64: $assinatura1Base64");
+    print("Assinatura 2 Base64: $assinatura2Base64");
+    print("Assinatura 3 Base64: $assinatura3Base64");
+    print("Assinatura 4 Base64: $assinatura4Base64");
+
+
+    // Imprimindo todas as imagens em Base64
+    print("Imagens Base64:");
+    for (var imagem in imagensBase64) {
+      print(
+          imagem); // Aqui você pode também limitar a quantidade de prints se as imagens forem grandes.
+    }
+    List<Map<String, dynamic>> listaApreensao = [];
+
+    // Verifique se a lista apreensoes não está vazia
     if (apreensoes.isEmpty) {
       print("ERRO: A lista de apreensões está vazia!");
     } else {
@@ -325,7 +483,8 @@ List<Map<String, dynamic>> listaApreensao = [];
         // Debug: Mostrando o conteúdo de cada apreensão antes da conversão
         print("Apreensão [$i]: ${apreensao.toString()}");
 
-        if (apreensao.containsKey("produtos") && apreensao["produtos"] is List) {
+        if (apreensao.containsKey("produtos") &&
+            apreensao["produtos"] is List) {
           List<Map<String, dynamic>> produtos = (apreensao["produtos"] as List)
               .map((produto) {
             return {
@@ -356,7 +515,7 @@ List<Map<String, dynamic>> listaApreensao = [];
 
     List<Map<String, dynamic>> listaInfracao = [];
 
-      // Verifique se a lista de infrações não está vazia
+    // Verifique se a lista de infrações não está vazia
     if (infracoes.isEmpty) {
       print("ERRO: A lista de infrações está vazia!");
     } else {
@@ -367,8 +526,10 @@ List<Map<String, dynamic>> listaApreensao = [];
         print("Infração [$i]: ${infracao.toString()}");
 
         // Verifica se a infração contém produtos e se é uma lista válida
-        if (infracao.containsKey("produtos_infracao") && infracao["produtos_infracao"] is List) {
-          List<Map<String, dynamic>> produtos = (infracao["produtos_infracao"] as List)
+        if (infracao.containsKey("produtos_infracao") &&
+            infracao["produtos_infracao"] is List) {
+          List<Map<String,
+              dynamic>> produtos = (infracao["produtos_infracao"] as List)
               .map((produto) {
             return {
               "produto_infracao": produto["produto_infracao"].text,
@@ -380,7 +541,7 @@ List<Map<String, dynamic>> listaApreensao = [];
             };
           }).toList();
 
-            // Adiciona a infração formatada na lista final
+          // Adiciona a infração formatada na lista final
           listaInfracao.add({
             "data_hora_infracao": infracao["data_hora_infracao"].text,
             "estadoIdSelecionado_infracao": infracao["estadoIdSelecionado_infracao"],
@@ -393,54 +554,15 @@ List<Map<String, dynamic>> listaApreensao = [];
       }
     }
 
-      // Debug: Exibir a lista final antes do envio
+    // Debug: Exibir a lista final antes do envio
     print("Lista de infrações JSON: ${jsonEncode(listaInfracao)}");
-    int contador = 1;
-
-    for (var imagem in imagens) {
-      if (imagem != null) {
-        try {
-          List<int> imageBytes = await imagem.readAsBytes();
-          String base64String = base64Encode(imageBytes);
-
-          // Verifique se o Base64 começa com o prefixo correto
-          String mimeType = 'image/png'; // Altere para o tipo de imagem correto, se necessário
-          base64String = 'data:$mimeType;base64,' + base64String;
-
-          imagensBase64.add(base64String);
-
-          // Debug da imagem processada
-          print("Imagem $contador convertida para Base64: ${base64String.substring(0, 100)}..."); // Exibir os primeiros 100 caracteres
-          contador++;
-        } catch (e) {
-          print("Erro ao processar a imagem $contador: $e");
-        }
-      } else {
-        print("Imagem $contador é nula e foi ignorada.");
-        contador++;
-      }
-    }
-
-// Verificar total de imagens convertidas
-    print("Total de imagens processadas: ${imagensBase64.length}");
-
-    // Printando as variáveis para ver o que está sendo enviado
-    print("Assinatura 1 Base64: $assinatura1Base64");
-    print("Assinatura 2 Base64: $assinatura2Base64");
-    print("Assinatura 3 Base64: $assinatura3Base64");
-    print("Assinatura 4 Base64: $assinatura4Base64");
-
-    // Imprimindo todas as imagens em Base64
-    print("Imagens Base64:");
-    for (var imagem in imagensBase64) {
-      print(imagem); // Aqui você pode também limitar a quantidade de prints se as imagens forem grandes.
-    }
 
     var connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult == ConnectivityResult.none) {
       // Salvar dados localmente
       await salvarDadosLocalmente();
-      _showDialog(context, "Dados Salvos Localmente", "Os dados foram salvos localmente.");
+      _showDialog(context, "Dados Salvos Localmente",
+          "Os dados foram salvos localmente.");
       return;
     }
 
@@ -448,6 +570,7 @@ List<Map<String, dynamic>> listaApreensao = [];
       url,
       body: {
         'user_id': widget.user_id.toString(),
+        'session_token': widget.session_token,
         'razaoSocial': razaoSocial.text,
         'email': email.text,
         'trcr': trcr.text,
@@ -455,16 +578,25 @@ List<Map<String, dynamic>> listaApreensao = [];
         'telefone': telefone.text,
         'telefoneResidencial': telefoneResidencial.text,
         'cnpj': cnpj.text,
+        'referencia': referencia.text,
+        'coordenada': coordenada.text,
         'respostaDocumentacao': jsonEncode(respostaDocumentacao),
         'observacoes': jsonEncode(observacoes),
         'data': data.text,
         'lista_deficiencia': lista_deficiencia.text,
         'observacoes_gerais': observacoes_gerais.text,
         'infracao': jsonEncode(infracao),
-       'qtd_autos_infracao': qtd_autos_infracao.text.isNotEmpty ? qtd_autos_infracao.text.toString() : '0',
-        'qtd_termos_aprensao': qtd_termos_aprensao.text.isNotEmpty ? qtd_termos_aprensao.text.toString() : '0',
-        'qtd_termos_depositario': qtd_termos_depositario.text.isNotEmpty ? qtd_termos_depositario.text.toString() : '0',
-        'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas.text,
+        'qtd_autos_infracao': qtd_autos_infracao.text.isNotEmpty
+            ? qtd_autos_infracao.text.toString()
+            : '0',
+        'qtd_termos_aprensao': qtd_termos_aprensao.text.isNotEmpty
+            ? qtd_termos_aprensao.text.toString()
+            : '0',
+        'qtd_termos_depositario': qtd_termos_depositario.text.isNotEmpty
+            ? qtd_termos_depositario.text.toString()
+            : '0',
+        'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas
+            .text,
         'prazo_deficiencias': prazo_deficiencias.text,
         'nome_fiscal_militar': nome_fiscal_militar.text,
         'fiscal_pg': postoGraduacaoController.text,
@@ -481,6 +613,11 @@ List<Map<String, dynamic>> listaApreensao = [];
         'assinatura3': assinatura3Base64,
         'assinatura4': assinatura4Base64,
         'imagens': jsonEncode(imagensBase64),
+
+        //Termos Apreensão.
+        'listaApreensao': jsonEncode(listaApreensao),
+        'listaInfracao': jsonEncode(listaInfracao),
+
       },
     );
 
@@ -505,16 +642,21 @@ List<Map<String, dynamic>> listaApreensao = [];
     List<String> dadosLocais = prefs.getStringList('dadosLocais') ?? [];
 
     // Verifique se as assinaturas são válidas
-    if (_assinatura1 == null || _assinatura2 == null || _assinatura3 == null || _assinatura4 == null) {
+    if (_assinatura1 == null || _assinatura2 == null || _assinatura3 == null ||
+        _assinatura4 == null) {
       print("Uma ou mais assinaturas estão nulas.");
       return; // Retorna se alguma assinatura for nula
     }
 
     // Converte assinaturas para base64
-    String assinatura1Base64 = await converterAssinaturaparaBase64(_assinatura1);
-    String assinatura2Base64 = await converterAssinaturaparaBase64(_assinatura2);
-    String assinatura3Base64 = await converterAssinaturaparaBase64(_assinatura3);
-    String assinatura4Base64 = await converterAssinaturaparaBase64(_assinatura4);
+    String assinatura1Base64 = await converterAssinaturaparaBase64(
+        _assinatura1);
+    String assinatura2Base64 = await converterAssinaturaparaBase64(
+        _assinatura2);
+    String assinatura3Base64 = await converterAssinaturaparaBase64(
+        _assinatura3);
+    String assinatura4Base64 = await converterAssinaturaparaBase64(
+        _assinatura4);
 
     List<String> imagensBase64 = await Future.wait(
       imagens.map((imagem) => converterImagemParaBase64(imagem!)),
@@ -531,17 +673,24 @@ List<Map<String, dynamic>> listaApreensao = [];
       'telefone': telefone.text,
       'telefoneResidencial': telefoneResidencial.text,
       'cnpj': cnpj.text,
-
+      'referencia': referencia.text,
+      'coordenada': coordenada.text,
       'respostaDocumentacao': jsonEncode(respostaDocumentacao),
       'observacoes': jsonEncode(observacoes),
       'data': data.text.isNotEmpty ? data.text : DateTime.now().toString(),
       'lista_deficiencia': lista_deficiencia.text,
       'observacoes_gerais': observacoes_gerais.text,
       'infracao': jsonEncode(infracao),
-      'qtd_autos_infracao': qtd_autos_infracao.text.isNotEmpty ? qtd_autos_infracao.text : '0',
-      'qtd_termos_aprensao': qtd_termos_aprensao.text.isNotEmpty ? int.tryParse(qtd_termos_aprensao.text)?.toString() ?? '0' : '0',
-      'qtd_termos_depositario': qtd_termos_depositario.text.isNotEmpty ? qtd_termos_depositario.text : '0',
-      'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas.text,
+      'qtd_autos_infracao': qtd_autos_infracao.text.isNotEmpty
+          ? qtd_autos_infracao.text
+          : '0',
+      'qtd_termos_aprensao': qtd_termos_aprensao.text.isNotEmpty ? int.tryParse(
+          qtd_termos_aprensao.text)?.toString() ?? '0' : '0',
+      'qtd_termos_depositario': qtd_termos_depositario.text.isNotEmpty
+          ? qtd_termos_depositario.text
+          : '0',
+      'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas
+          .text,
       'prazo_deficiencias': prazo_deficiencias.text,
       'nome_fiscal_militar': nome_fiscal_militar.text,
       'postoGraduacaoController': postoGraduacaoController.text,
@@ -580,8 +729,8 @@ List<Map<String, dynamic>> listaApreensao = [];
     // Limpar dados locais após o envio bem-sucedido de todos os registros
     await limparDadosLocais();
   }
-  Future<void> enviarDadosParaServidor(
-      String razaoSocial,
+
+  Future<void> enviarDadosParaServidor(String razaoSocial,
       String email,
       String data,
       String trcr,
@@ -589,15 +738,11 @@ List<Map<String, dynamic>> listaApreensao = [];
       String telefone,
       String telefoneResidencial,
       String cnpj,
+      String referencia,
+      String coordenada,
       String? respostaDocumentacao,
       String observacoes,
       String lista_deficiencia,
-      String nome_fiscal_militar,
-      String postoGraduacaoController, // Novo parâmetro
-      String idtMilitarController, // Novo parâmetro
-      String omMilitarController, // Novo parâmetro
-      String nome_empresa,
-      String cpf_empresa,
       String observacoes_gerais,
       String? infracao,
       String qtd_autos_infracao,
@@ -605,6 +750,12 @@ List<Map<String, dynamic>> listaApreensao = [];
       String qtd_termos_depositario,
       String especificar_deficiencias_encontradas,
       String prazo_deficiencias,
+      String nome_fiscal_militar,
+      String postoGraduacaoController, // Novo parâmetro
+      String idtMilitarController, // Novo parâmetro
+      String omMilitarController, // Novo parâmetro
+      String nome_empresa,
+      String cpf_empresa,
       String testemunha1,
       String idtestemunha1,
       String testemunha2,
@@ -613,9 +764,7 @@ List<Map<String, dynamic>> listaApreensao = [];
       String assinatura2Base64,
       String assinatura3Base64,
       String assinatura4Base64,
-      List<String> imagensBase64,
-      ) async {
-
+      List<String> imagensBase64,) async {
     String urlApi = Api.url;
     String arquivoJson = "FormFiscalizacao/FormVistoriaPce.php";
     final url = Uri.parse('$urlApi/$arquivoJson');
@@ -629,7 +778,6 @@ List<Map<String, dynamic>> listaApreensao = [];
       print("Imagem $i: ${imagensBase64[i].substring(0, 100)}...");
     }
 
-
     final response = await http.post(
       url,
       body: {
@@ -641,29 +789,44 @@ List<Map<String, dynamic>> listaApreensao = [];
         'telefone': telefone,
         'telefoneResidencial': telefoneResidencial,
         'cnpj': cnpj,
+        'referencia': referencia,
+        'coordenada': coordenada,
         'respostaDocumentacao': respostaDocumentacao ?? '',
         'observacoes': observacoes,
         'data': data,
         'lista_deficiencia': lista_deficiencia,
         'observacoes_gerais': observacoes_gerais,
-
         'infracao': infracao ?? '',
 
-        'qtd_autos_infracao': qtd_autos_infracao, // Novo parâmetro
-        'qtd_termos_aprensao': qtd_termos_aprensao, // Novo parâmetro
-        'qtd_termos_depositario': qtd_termos_depositario, // Novo parâmetro
-        'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas, // Novo parâmetro
-        'prazo_deficiencias': prazo_deficiencias, // Novo parâmetro
-        'nome_fiscal_militar': nome_fiscal_militar, // Novo parâmetro
-        'fiscal_pg': postoGraduacaoController, // Novo parâmetro
+        'qtd_autos_infracao': qtd_autos_infracao,
+        // Novo parâmetro
+        'qtd_termos_aprensao': qtd_termos_aprensao,
+        // Novo parâmetro
+        'qtd_termos_depositario': qtd_termos_depositario,
+        // Novo parâmetro
+        'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas,
+        // Novo parâmetro
+        'prazo_deficiencias': prazo_deficiencias,
+        // Novo parâmetro
+        'nome_fiscal_militar': nome_fiscal_militar,
+        // Novo parâmetro
+        'fiscal_pg': postoGraduacaoController,
+        // Novo parâmetro
         'idtmilitar': idtMilitarController,
-        'ommilitar': omMilitarController, // Novo parâmetro
-        'nome_empresa': nome_empresa, // Novo parâmetro
-        'cpf_empresa': cpf_empresa, // Novo parâmetro
-        'testemunha1': testemunha1, // Novo parâmetro
-        'idtestemunha1': idtestemunha1, // Novo parâmetro
-        'testemunha2': testemunha2, // Novo parâmetro
-        'idtestemunha2': idtestemunha2, // Novo parâmetro
+        'ommilitar': omMilitarController,
+        // Novo parâmetro
+        'nome_empresa': nome_empresa,
+        // Novo parâmetro
+        'cpf_empresa': cpf_empresa,
+        // Novo parâmetro
+        'testemunha1': testemunha1,
+        // Novo parâmetro
+        'idtestemunha1': idtestemunha1,
+        // Novo parâmetro
+        'testemunha2': testemunha2,
+        // Novo parâmetro
+        'idtestemunha2': idtestemunha2,
+        // Novo parâmetro
 
         'assinatura1': assinatura1Base64,
         'assinatura2': assinatura2Base64,
@@ -684,7 +847,8 @@ List<Map<String, dynamic>> listaApreensao = [];
 
       if (responseData['status'] == 'success') {
         _showDialog(context, "Sucesso", "Cadastro bem-sucedido.");
-        await removerRegistroLocal(jsonEncode({'razaoSocial': razaoSocial, 'email': email}));
+        await removerRegistroLocal(
+            jsonEncode({'razaoSocial': razaoSocial, 'email': email}));
       } else {
         _showDialog(context, "Erro", responseData['message']);
       }
@@ -716,10 +880,14 @@ List<Map<String, dynamic>> listaApreensao = [];
         // Verificando se 'imagensBase64' ou 'baseImagensBase64' existe e imprimindo o tipo
         if (dadosMap.containsKey('imagensBase64')) {
           imagensBase64 = List<String>.from(dadosMap['imagensBase64']);
-          print("Imagens armazenadas em 'imagensBase64'. Número de imagens: ${imagensBase64.length}");
+          print(
+              "Imagens armazenadas em 'imagensBase64'. Número de imagens: ${imagensBase64
+                  .length}");
         } else if (dadosMap.containsKey('baseImagensBase64')) {
           imagensBase64 = List<String>.from(dadosMap['baseImagensBase64']);
-          print("Imagens armazenadas em 'baseImagensBase64'. Número de imagens: ${imagensBase64.length}");
+          print(
+              "Imagens armazenadas em 'baseImagensBase64'. Número de imagens: ${imagensBase64
+                  .length}");
         } else {
           print("Nenhuma imagem encontrada nos dados locais.");
         }
@@ -733,6 +901,7 @@ List<Map<String, dynamic>> listaApreensao = [];
 
     return dadosLocais;
   }
+
 // Método para remover registro local
   Future<void> removerRegistroLocal(String dados) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -749,7 +918,8 @@ List<Map<String, dynamic>> listaApreensao = [];
     super.initState();
     // Adicionar um listener para verificar a conexão
     Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
-      if (result == ConnectivityResult.mobile || result == ConnectivityResult.wifi) {
+      if (result == ConnectivityResult.mobile ||
+          result == ConnectivityResult.wifi) {
         // Enviar os dados salvos localmente quando a conexão é restaurada
         enviarDadosSalvosLocalmente(context);
       }
@@ -757,12 +927,15 @@ List<Map<String, dynamic>> listaApreensao = [];
 
     // Carregar os dados locais
     carregarDadosLocais();
-    // Obtém a localização assim que a tela for carregada
-    _assinatura1 = SignatureController(penStrokeWidth: 2, penColor: Colors.black);
-    _assinatura2 = SignatureController(penStrokeWidth: 2, penColor: Colors.black);
-    _assinatura3 = SignatureController(penStrokeWidth: 2, penColor: Colors.black);
-    _assinatura4 = SignatureController(penStrokeWidth: 2, penColor: Colors.black);
-
+    _getCurrentLocation(); // Obtém a localização assim que a tela for carregada
+    _assinatura1 =
+        SignatureController(penStrokeWidth: 2, penColor: Colors.black);
+    _assinatura2 =
+        SignatureController(penStrokeWidth: 2, penColor: Colors.black);
+    _assinatura3 =
+        SignatureController(penStrokeWidth: 2, penColor: Colors.black);
+    _assinatura4 =
+        SignatureController(penStrokeWidth: 2, penColor: Colors.black);
 
     idtMilitarController.text = widget.idtMilitar.toString();
     omMilitarController.text = widget.omMilitar.toString();
@@ -804,12 +977,11 @@ List<Map<String, dynamic>> listaApreensao = [];
   }
 
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Exposição de PCE"),
+        title: Text("Vistoria PCE"),
         backgroundColor: Color.fromRGBO(17, 48, 33, 1),
         iconTheme: IconThemeData(color: Colors.white),
         titleTextStyle: TextStyle(
@@ -836,7 +1008,7 @@ List<Map<String, dynamic>> listaApreensao = [];
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
-                        "Termo de fiscalização para exposição de PCE. ",
+                        "Termo de Fiscalização/Vistoria de Empresas que Realizam serviço de detonação e Aplicação de Explosivos ",
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -853,8 +1025,6 @@ List<Map<String, dynamic>> listaApreensao = [];
               buildExpansionTile(),
               SizedBox(height: 20),
               buildExpansionVerificacaoEmpresaTile(),
-
-
               SizedBox(height: 20),
               buildIdentificacaoDeficienciaTile(),
               SizedBox(height: 20),
@@ -867,14 +1037,14 @@ List<Map<String, dynamic>> listaApreensao = [];
               buildImagePicker(),
               SizedBox(height: 20),
 
-
               SizedBox(height: 20),
               Text("Assinaturas"),
               SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(child: buildAssinaturaForm("Fiscal Militar", _assinatura1)),
+                  Expanded(child: buildAssinaturaForm(
+                      "Fiscal Militar", _assinatura1)),
                   SizedBox(width: 10,),
                 ],
               ),
@@ -904,7 +1074,8 @@ List<Map<String, dynamic>> listaApreensao = [];
               SizedBox(height: 6),
               Row(
                 children: [
-                  Expanded(child: buildAssinaturaForm("Responsável pela Empresa", _assinatura2)),
+                  Expanded(child: buildAssinaturaForm(
+                      "Responsável pela Empresa", _assinatura2)),
                   SizedBox(width: 10,),
                 ],
               ),
@@ -923,7 +1094,8 @@ List<Map<String, dynamic>> listaApreensao = [];
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(child: buildAssinaturaForm("Testemunha 1", _assinatura3)),
+                  Expanded(
+                      child: buildAssinaturaForm("Testemunha 1", _assinatura3)),
                   SizedBox(width: 10,),
                 ],
               ),
@@ -941,7 +1113,8 @@ List<Map<String, dynamic>> listaApreensao = [];
               SizedBox(height: 6,),
               Row(
                 children: [
-                  Expanded(child: buildAssinaturaForm("Testemunha 2", _assinatura4)),
+                  Expanded(
+                      child: buildAssinaturaForm("Testemunha 2", _assinatura4)),
                 ],
               ),
 
@@ -957,12 +1130,58 @@ List<Map<String, dynamic>> listaApreensao = [];
                 ],
               ),
 
-              SizedBox(height: 20,),
+              ElevatedButton(
+                  onPressed: () async {
+                    if (_assinatura1.isEmpty || _assinatura2.isEmpty ||
+                        _assinatura3.isEmpty || _assinatura4.isEmpty) {
+                      List<String> assinaturaemBranco = [];
+
+                      if (_assinatura1.isEmpty) assinaturaemBranco.add(
+                          "Assinatura 1");
+                      if (_assinatura2.isEmpty) assinaturaemBranco.add(
+                          "Assinatura 2");
+                      if (_assinatura3.isEmpty) assinaturaemBranco.add(
+                          "Assinatura 3");
+                      if (_assinatura4.isEmpty) assinaturaemBranco.add(
+                          "Assinatura 4");
+
+                      //Assinatura
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(
+                              "Os Seguintes campos estão em Branco  ${assinaturaemBranco
+                                  .join(", ")} "),)
+                      );
+                    }
+                    else {
+                      await enviarDadosSalvosLocalmente(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text("Assinatura Salva com Sucesso "))
+                      );
+                    }
+                  },
+                  child: Text("Salvar Assinaturas")
+              ),
+              SizedBox(width: 20,),
+
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    enviarDadosFormulario(context);
+                    int? qtdTermos = int.tryParse(qtd_termos_aprensao.text);
+                    int? qtdTermosIfracao = int.tryParse(
+                        qtd_autos_infracao.text);
+
+                    // Verifica se o valor é válido (não nulo) e maior que zero
+                    if (qtdTermos != null && qtdTermos > 0 ||
+                        qtdTermosIfracao != null && qtdTermosIfracao > 0) {
+                      exibirPopupTermosApreensao(context, qtdTermos!,
+                          qtdTermosIfracao!); // Passando qtdTermos para o popup
+                    }
+                    else {
+                      enviarDadosFormulario(
+                          context); // Grava diretamente no banco de dados
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     foregroundColor: Colors.white,
@@ -984,27 +1203,8 @@ List<Map<String, dynamic>> listaApreensao = [];
             ],
           ),
 
-
         ),
 
-      ),
-    );
-  }
-  Widget buildCamposDinamicos() {
-    return Container(
-      margin: const EdgeInsets.all(16.0),
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.3),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: Offset(0, 3),
-          ),
-        ],
       ),
     );
   }
@@ -1071,7 +1271,7 @@ List<Map<String, dynamic>> listaApreensao = [];
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            TextButton(onPressed: (){
+            TextButton(onPressed: () {
               controller.clear();
             },
                 child: Text("Limpar")
@@ -1125,39 +1325,60 @@ List<Map<String, dynamic>> listaApreensao = [];
                         "Nome: ${dadosMap['nome'] ?? 'N/A'}\n"
                             "Email: ${dadosMap['email'] ?? 'N/A'}\n"
                             "Número: ${dadosMap['numero'] ?? 'N/A'}\n"
-                            "Razão Social: ${dadosMap['razaoSocial'] ?? 'N/A'}\n"
+                            "Razão Social: ${dadosMap['razaoSocial'] ??
+                            'N/A'}\n"
                             "Data: ${dadosMap['data'] ?? 'N/A'}\n"
                             "TRCR: ${dadosMap['trcr'] ?? 'N/A'}\n"
                             "Endereço: ${dadosMap['endereco'] ?? 'N/A'}\n"
                             "Telefone: ${dadosMap['telefone'] ?? 'N/A'}\n"
-                            "Telefone Residencial: ${dadosMap['telefoneResidencial'] ?? 'N/A'}\n"
+                            "Telefone Residencial: ${dadosMap['telefoneResidencial'] ??
+                            'N/A'}\n"
                             "CNPJ: ${dadosMap['cnpj'] ?? 'N/A'}\n"
-                            "Resposta Documentação: ${dadosMap['respostaDocumentacao'] ?? 'N/A'}\n"
+                            "Referência: ${dadosMap['referencia'] ?? 'N/A'}\n"
+                            "Coordenada: ${dadosMap['coordenada'] ?? 'N/A'}\n"
+                            "Resposta Empresa: ${dadosMap['respostaDocumentacao'] ??
+                            'N/A'}\n"
                             "Observações: ${dadosMap['observacoes'] ?? 'N/A'}\n"
-                            "Lista Deficiência: ${dadosMap['lista_deficiencia'] ?? 'N/A'}\n"
-                            "Observações Gerais: ${dadosMap['observacoes_gerais'] ?? 'N/A'}\n"
+                            "Lista Deficiência: ${dadosMap['lista_deficiencia'] ??
+                            'N/A'}\n"
+                            "Observações Gerais: ${dadosMap['observacoes_gerais'] ??
+                            'N/A'}\n"
                             "Infração: ${dadosMap['infracao'] ?? 'N/A'}\n"
-                            "Quantidade de Autos de Infração: ${dadosMap['qtd_autos_infracao'] ?? 'N/A'}\n"
-                            "Quantidade de Termos de Apreensão: ${dadosMap['qtd_termos_aprensao'] ?? 'N/A'}\n"
-                            "Quantidade de Termos de Depositário: ${dadosMap['qtd_termos_depositario'] ?? 'N/A'}\n"
-                            "Especificar Deficiências Encontradas: ${dadosMap['especificar_deficiencias_encontradas'] ?? 'N/A'}\n"
-                            "Nome Fiscal Militar: ${dadosMap['nome_fiscal_militar'] ?? 'N/A'}\n"
+                            "Quantidade de Autos de Infração: ${dadosMap['qtd_autos_infracao'] ??
+                            'N/A'}\n"
+                            "Quantidade de Termos de Apreensão: ${dadosMap['qtd_termos_aprensao'] ??
+                            'N/A'}\n"
+                            "Quantidade de Termos de Depositário: ${dadosMap['qtd_termos_depositario'] ??
+                            'N/A'}\n"
+                            "Especificar Deficiências Encontradas: ${dadosMap['especificar_deficiencias_encontradas'] ??
+                            'N/A'}\n"
+                            "Nome Fiscal Militar: ${dadosMap['nome_fiscal_militar'] ??
+                            'N/A'}\n"
                             "CPF Empresa: ${dadosMap['cpf_empresa'] ?? 'N/A'}\n"
-                            "Testemunha 1: ${dadosMap['testemunha1'] ?? 'N/A'}\n"
-                            "ITD : ${dadosMap['idtestemunha1'] ?? 'N/A'}\n"
-                            "Testemunha 2: ${dadosMap['testemunha2'] ?? 'N/A'}\n"
-                            "ITD 2: ${dadosMap['idtestemunha2'] ?? 'N/A'}\n"
-                            "Assinatura 1 (Base64): ${dadosMap['assinatura1Base64'] ?? 'N/A'}\n"
-                            "Assinatura 2 (Base64): ${dadosMap['assinatura2Base64'] ?? 'N/A'}\n"
-                            "Assinatura 3 (Base64): ${dadosMap['assinatura3Base64'] ?? 'N/A'}\n"
-                            "Assinatura 4 (Base64): ${dadosMap['assinatura4Base64'] ?? 'N/A'}\n"
+                            "Testemunha 1: ${dadosMap['testemunha1'] ??
+                            'N/A'}\n"
+                            "IDT : ${dadosMap['idtestemunha2'] ?? 'N/A'}\n"
+                            "Testemunha 2: ${dadosMap['testemunha2'] ??
+                            'N/A'}\n"
+                            "IDT 2: ${dadosMap['idtestemunha2'] ?? 'N/A'}\n"
+                            "Infração: ${dadosMap['infracao'] ?? 'N/A'}\n"
+                            "Assinatura 1 (Base64): ${dadosMap['assinatura1Base64'] ??
+                            'N/A'}\n"
+                            "Assinatura 2 (Base64): ${dadosMap['assinatura2Base64'] ??
+                            'N/A'}\n"
+                            "Assinatura 3 (Base64): ${dadosMap['assinatura3Base64'] ??
+                            'N/A'}\n"
+                            "Assinatura 4 (Base64): ${dadosMap['assinatura4Base64'] ??
+                            'N/A'}\n"
                             "Imagens (Base64):\n" +
                             "Imagens (Base64):\n" +
-                            (dadosMap['imagens'] != null && dadosMap['imagens'] is List
+                            (dadosMap['imagens'] != null &&
+                                dadosMap['imagens'] is List
                                 ? List<String>.from(dadosMap['imagens'])
                                 .asMap()
                                 .entries
-                                .map((entry) => "  Imagem ${entry.key + 1}: ${entry.value.substring(0, 100)}...")
+                                .map((entry) => "  Imagem ${entry.key +
+                                1}: ${entry.value.substring(0, 100)}...")
                                 .join("\n")
                                 : "Nenhuma imagem disponível.") +
                             "\n",
@@ -1171,21 +1392,25 @@ List<Map<String, dynamic>> listaApreensao = [];
                             List<String> imagensBase64 = [];
 
                             // Verifica se 'imagensBase64' existe e é uma lista
-                            if (dadosMap['imagens'] != null && dadosMap['imagens'] is List) {
-                              imagensBase64 = List<String>.from(dadosMap['imagens']);
+                            if (dadosMap['imagens'] != null &&
+                                dadosMap['imagens'] is List) {
+                              imagensBase64 =
+                              List<String>.from(dadosMap['imagens']);
 
                               // Adiciona nomes às imagens
                               imagensBase64 = imagensBase64
                                   .asMap()
                                   .entries
-                                  .map((entry) => "Imagem_${entry.key + 1}: ${entry.value}")
+                                  .map((entry) => "Imagem_${entry.key +
+                                  1}: ${entry.value}")
                                   .toList();
                             }
 
                             // Debug: Exibe as imagens no console
                             print("Imagens encontradas para envio:");
                             imagensBase64.forEach((imagem) {
-                              print(imagem.substring(0, 100)); // Exibe apenas os primeiros 100 caracteres
+                              print(imagem.substring(0,
+                                  100)); // Exibe apenas os primeiros 100 caracteres
                             });
 
                             // Chama o método que envia os dados para o servidor
@@ -1198,18 +1423,30 @@ List<Map<String, dynamic>> listaApreensao = [];
                                 dadosMap['telefone'] ?? '',
                                 dadosMap['telefoneResidencial'] ?? '',
                                 dadosMap['cnpj'] ?? '',
+                                dadosMap['referencia'] ?? '',
+                                dadosMap['coordenada'] ?? '',
                                 dadosMap['respostaDocumentacao'] ?? '',
                                 dadosMap['observacoes'] ?? '',
                                 dadosMap['lista_deficiencia'] ?? '',
                                 dadosMap['observacoes_gerais'] ?? '',
                                 dadosMap['infracao'] ?? '',
-                                dadosMap['qtd_autos_infracao']?.isNotEmpty == true ? dadosMap['qtd_autos_infracao'] : '0',
-                                dadosMap['qtd_termos_aprensao']?.isNotEmpty == true ? dadosMap['qtd_termos_aprensao'] : '0',
-                                dadosMap['qtd_termos_depositario']?.isNotEmpty == true ? dadosMap['qtd_termos_depositario'] : '0',
-                                dadosMap['especificar_deficiencias_encontradas'] ?? '',
+                                dadosMap['qtd_autos_infracao']?.isNotEmpty ==
+                                    true ? dadosMap['qtd_autos_infracao'] : '0',
+                                dadosMap['qtd_termos_aprensao']?.isNotEmpty ==
+                                    true
+                                    ? dadosMap['qtd_termos_aprensao']
+                                    : '0',
+                                dadosMap['qtd_termos_depositario']
+                                    ?.isNotEmpty == true
+                                    ? dadosMap['qtd_termos_depositario']
+                                    : '0',
+                                dadosMap['especificar_deficiencias_encontradas'] ??
+                                    '',
                                 dadosMap['prazo_deficiencias'] ?? '',
-                                dadosMap['nome_fiscal_militar'] ?? '',dadosMap['postoGraduacaoController'] ?? '',
-                                dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                                dadosMap['nome_fiscal_militar'] ?? '',
+                                dadosMap['postoGraduacaoController'] ?? '',
+                                dadosMap['idtMilitarController'] ?? '',
+                                // Novo parâmetro
                                 dadosMap['omMilitarController'] ?? '',
                                 dadosMap['nome_empresa'] ?? '',
                                 dadosMap['cpf_empresa'] ?? '',
@@ -1226,7 +1463,8 @@ List<Map<String, dynamic>> listaApreensao = [];
 
 
                             // Após o envio, remove o registro local
-                            print("Dados enviados com sucesso! Removendo registro local...");
+                            print(
+                                "Dados enviados com sucesso! Removendo registro local...");
                             await removerRegistroLocal(dados);
                           } catch (error, stackTrace) {
                             // Em caso de erro, exibe a mensagem e a pilha de erro
@@ -1245,7 +1483,6 @@ List<Map<String, dynamic>> listaApreensao = [];
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     buildIdentificacaoForm(),
-                    SizedBox(height: 20),
 
                   ],
                 ),
@@ -1288,19 +1525,24 @@ List<Map<String, dynamic>> listaApreensao = [];
             SizedBox(width: 10,),
             Expanded(
               flex: 1,
-              child: buildFormFieldComMascara("Telefone Residencial:", telefoneResidencial, telefoneMask),
-            ),
-            Expanded(
-              flex: 1,
-              child: buildFormFieldComMascara("E-mail:", email, emailMask),
+              child: buildFormFieldComMascara(
+                  "Telefone Residencial:", telefoneResidencial, telefoneMask),
             ),
           ],
         ),
-
+        SizedBox(height: 10),
+        buildFormField("E-mail:", email),
         SizedBox(height: 10),
         buildFormFieldComMascaraData("Data:", data, dataMask),
-
-
+        SizedBox(height: 10),
+        buildFormFieldComMascara(
+            "Ponto de refêrencia:", referencia, letrasMask),
+        SizedBox(height: 10),
+        buildFormFieldComMascara("Coordenada:", coordenada, coordenadaMask),
+        ElevatedButton(
+          onPressed: abrirMapa,
+          child: Text("Selecionar no Mapa"),
+        ),
       ],
     );
   }
@@ -1312,8 +1554,8 @@ List<Map<String, dynamic>> listaApreensao = [];
       builder: (context, snapshot) {
         bool temDadosNaoSalvos = snapshot.hasData && snapshot.data!.isNotEmpty;
         String titulo = temDadosNaoSalvos
-            ? "Verificação Documental (Registros não enviados)"
-            : "Verificação Documental";
+            ? "Verificação Das Condições Técnicas e de Segurança (Registros não enviados)"
+            : "Verificação Das Condições Técnicas e de Segurança";
 
         return Container(
           margin: EdgeInsets.only(bottom: 10.0),
@@ -1351,16 +1593,21 @@ List<Map<String, dynamic>> listaApreensao = [];
                       trailing: IconButton(
                         icon: Icon(Icons.send),
                         onPressed: () async {
-                          List<String> imagensBase64 = dadosMap.containsKey('imagensBase64') && dadosMap['imagensBase64'] is List
+                          List<String> imagensBase64 = dadosMap.containsKey(
+                              'imagensBase64') &&
+                              dadosMap['imagensBase64'] is List
                               ? List<String>.from(dadosMap['imagensBase64'])
                               : [];
-                          print("Imagens Base64 para envio: ${imagensBase64.length}");
+                          print("Imagens Base64 para envio: ${imagensBase64
+                              .length}");
 
 
                           // Adicionar debug para verificar as imagens recuperadas
-                          print("Imagens recuperadas (Base64): ${imagensBase64.length} imagens.");
+                          print("Imagens recuperadas (Base64): ${imagensBase64
+                              .length} imagens.");
                           for (int i = 0; i < imagensBase64.length; i++) {
-                            print("Imagem $i: ${imagensBase64[i].substring(0, 100)}..."); // Mostra apenas o início da string
+                            print("Imagem $i: ${imagensBase64[i].substring(0,
+                                100)}..."); // Mostra apenas o início da string
                           }
 
                           try {
@@ -1373,6 +1620,8 @@ List<Map<String, dynamic>> listaApreensao = [];
                               dadosMap['telefone'] ?? '',
                               dadosMap['telefoneResidencial'] ?? '',
                               dadosMap['cnpj'] ?? '',
+                              dadosMap['referencia'] ?? '',
+                              dadosMap['coordenada'] ?? '',
                               dadosMap['respostaDocumentacao'] ?? '',
                               dadosMap['observacoes'] ?? '',
                               dadosMap['lista_deficiencia'] ?? '',
@@ -1381,11 +1630,13 @@ List<Map<String, dynamic>> listaApreensao = [];
                               dadosMap['qtd_autos_infracao'] ?? '',
                               dadosMap['qtd_termos_aprensao'] ?? '',
                               dadosMap['qtd_termos_depositario'] ?? '',
-                              dadosMap['especificar_deficiencias_encontradas'] ?? '',
+                              dadosMap['especificar_deficiencias_encontradas'] ??
+                                  '',
                               dadosMap['prazo_deficiencias'] ?? '',
                               dadosMap['nome_fiscal_militar'] ?? '',
                               dadosMap['postoGraduacaoController'] ?? '',
-                              dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                              dadosMap['idtMilitarController'] ?? '',
+                              // Novo parâmetro
                               dadosMap['omMilitarController'] ?? '',
                               dadosMap['nome_empresa'] ?? '',
                               dadosMap['cpf_empresa'] ?? '',
@@ -1416,9 +1667,48 @@ List<Map<String, dynamic>> listaApreensao = [];
                   children: [
                     buildIdentificacaoEmpresaForm(),
                     SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          int? qtdTermos = int.tryParse(
+                              qtd_termos_aprensao.text);
+                          int? qtdTermosIfracao = int.tryParse(
+                              qtd_autos_infracao.text);
 
+                          // Verifica se o valor é válido (não nulo) e maior que zero
+                          if (qtdTermos != null && qtdTermos > 0 ||
+                              qtdTermosIfracao != null &&
+                                  qtdTermosIfracao > 0) {
+                            exibirPopupTermosApreensao(context, qtdTermos!,
+                                qtdTermosIfracao!); // Passando qtdTermos para o popup
+                          }
+                          else {
+                            enviarDadosFormulario(
+                                context); // Grava diretamente no banco de dados
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.green,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.0),
+                          ),
+                          padding: EdgeInsets.symmetric(vertical: 15.0),
+                        ),
+                        child: Text(
+                          "Salvar dados",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+
+                    ),
                   ],
                 ),
+
               ),
             ],
           ),
@@ -1430,7 +1720,7 @@ List<Map<String, dynamic>> listaApreensao = [];
   // Construindo o formulário
   Widget buildIdentificacaoEmpresaForm() {
     List<String> perguntas = [
-      "O Certificado de Registro (CR) da empresa responsável pela exposição está vigente?",
+        "O Certificado de Registro (CR) da empresa responsável pela exposição está vigente?",
       /*"Possui a atividade de utilização - demonstração / exposição de arma de fogo apostilada ao CR válido? (Ou do PCE a ser exposto). (Anexo B5 da Port nº 56/COLOG; Nr III do Art 3º da Port no 150/COLOG).",
       "Possui autorização do SFPC Regional para a realização do evento? (Art. 140 do Dec nº 10.030/2019)",
           "Existe controle de que todas as empresas envolvidas na exposição possuam atividade de exposição do PCE exposto e GT dos itens a serem expostos, incluindo prévia autorização do SFPC Regional?(Art. 15 do § 1º da Port nº 1.729/Cmt Ex).",
@@ -1456,9 +1746,7 @@ List<Map<String, dynamic>> listaApreensao = [];
       "O acervo exposto pertence ao Colecionador?",
       "Existe local de depósito destinado a armazenagem de PCE compatível com o estoque?",
       "Existe responsável pelo armazenamento dos PCE ? (Art 8º da Port nº 150 - COLOG/2019)",*/
-
     ];
-
     if (respostaDocumentacao.length < perguntas.length) {
       respostaDocumentacao = List.generate(perguntas.length, (index) => "");
     }
@@ -1496,7 +1784,9 @@ List<Map<String, dynamic>> listaApreensao = [];
                   child: RadioListTile<String>(
                     title: Text("Sim"),
                     value: "Sim",
-                    groupValue: respostaDocumentacao.length > index ? respostaDocumentacao[index] : null,
+                    groupValue: respostaDocumentacao.length > index
+                        ? respostaDocumentacao[index]
+                        : null,
                     onChanged: (value) {
                       setState(() {
                         if (respostaDocumentacao.length > index) {
@@ -1512,7 +1802,27 @@ List<Map<String, dynamic>> listaApreensao = [];
                   child: RadioListTile<String>(
                     title: Text("Não"),
                     value: "Não",
-                    groupValue: respostaDocumentacao.length > index ? respostaDocumentacao[index] : null,
+                    groupValue: respostaDocumentacao.length > index
+                        ? respostaDocumentacao[index]
+                        : null,
+                    onChanged: (value) {
+                      setState(() {
+                        if (respostaDocumentacao.length > index) {
+                          respostaDocumentacao[index] = value;
+                        } else {
+                          respostaDocumentacao.add(value);
+                        }
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: RadioListTile<String>(
+                    title: Text("Não se aplica"),
+                    value: "Não se aplica",
+                    groupValue: respostaDocumentacao.length > index
+                        ? respostaDocumentacao[index]
+                        : null,
                     onChanged: (value) {
                       setState(() {
                         if (respostaDocumentacao.length > index) {
@@ -1541,7 +1851,8 @@ List<Map<String, dynamic>> listaApreensao = [];
                 "Detalhes da Observação",
                 observacoes.length > index ? observacoes[index] : '',
                 index, // Passa o index para a função
-                    (String value) { // Garantir que o tipo da função seja String
+                    (
+                    String value) { // Garantir que o tipo da função seja String
                   if (observacoes.length > index) {
                     observacoes[index] = value;
                   } else {
@@ -1556,8 +1867,28 @@ List<Map<String, dynamic>> listaApreensao = [];
     );
   }
 
+  // Função auxiliar para construir campos de texto
+  Widget buildFormFieldDocumental(String hint, String initialValue, int index, Function(String) onChanged) {
+    return TextField(
+      decoration: InputDecoration(
+        border: OutlineInputBorder(),
+        hintText: "Não se Aplica",
+      ),
+      onChanged: (value) {
+        // Verifica se o campo foi deixado em branco ou não
+        if (value.isEmpty && respostaDocumentacao.length <= index) {
+          // Se o campo foi deixado em branco, adicione "Não se Aplica"
+          onChanged("S/A");
+        } else {
+          // Caso contrário, mantém o valor informado
+          onChanged(value);
+        }
+      },
+      controller: TextEditingController(text: initialValue.isEmpty ? "S/A" : initialValue),    );
+  }
   // Função para construir o campo de entrada
-  Widget buildFormFieldEmpresa(String hint, String initialValue, int index, Function(String) onChanged) {
+  Widget buildFormFieldEmpresa(String hint, String initialValue, int index,
+      Function(String) onChanged) {
     return TextField(
       decoration: InputDecoration(
         border: OutlineInputBorder(),
@@ -1573,139 +1904,11 @@ List<Map<String, dynamic>> listaApreensao = [];
           onChanged(value);
         }
       },
-      controller: TextEditingController(text: initialValue.isEmpty ? "Não se Aplica" : initialValue),
+      controller: TextEditingController(
+          text: initialValue.isEmpty ? "Não se Aplica" : initialValue),
 
     );
   }
-  //Formulário Condição Execução
-  Widget buildExpansionCondicaoExecucaoTile() {
-    return FutureBuilder<List<String>>(
-      future: carregarDadosLocais(),
-      builder: (context, snapshot) {
-        bool temDadosNaoSalvos = snapshot.hasData && snapshot.data!.isNotEmpty;
-        String titulo = temDadosNaoSalvos
-            ? "Verificação das Condiçoes de Execução (Registros não enviados)"
-            : "Verificação das Condiçoes de Execução";
-        List<String> imagensBase64 = [];
-        return Container(
-          margin: EdgeInsets.only(bottom: 10.0),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10.0),
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color.fromRGBO(243, 243, 243, 1.0),
-                Color.fromRGBO(217, 217, 217, 1.0),
-              ],
-            ),
-          ),
-          child: ExpansionTile(
-            title: Text(
-              titulo,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
-            children: [
-              if (temDadosNaoSalvos)
-                Column(
-                  children: snapshot.data!.map((dados) {
-                    Map<String, dynamic> dadosMap = jsonDecode(dados);
-                    return ListTile(
-                      title: Text("Registro salvo localmente"),
-                      subtitle: Text(
-                        "Nome: ${dadosMap['nome']}\nEmail: ${dadosMap['email']}\nNúmero: ${dadosMap['numero']}",
-                      ),
-                      trailing: IconButton(
-                        icon: Icon(Icons.send),
-                        onPressed: () async {
-                          List<String> imagensBase64 = List<String>.from(dadosMap['imagensBase64'] ?? []);
-                          await enviarDadosParaServidor(
-                            dadosMap['razaoSocial'] ?? '',
-                            dadosMap['email'] ?? '',
-                            dadosMap['data'] ?? '',
-                            dadosMap['trcr'] ?? '',
-                            dadosMap['endereco'] ?? '',
-                            dadosMap['telefone'] ?? '',
-                            dadosMap['telefoneResidencial'] ?? '',
-                            dadosMap['cnpj'] ?? '',
-                            dadosMap['respostaDocumentacao'] ?? '',
-                            dadosMap['observacoes'] ?? '',
-                            dadosMap['lista_deficiencia'] ?? '',
-                            dadosMap['observacoes_gerais'] ?? '',
-                            dadosMap['infracao'] ?? '',
-                            dadosMap['qtd_autos_infracao'] ?? '', // Novo parâmetro
-                            dadosMap['qtd_termos_aprensao'] ?? '', // Novo parâmetro
-                            dadosMap['qtd_termos_depositario'] ?? '', // Novo parâmetro
-                            dadosMap['especificar_deficiencias_encontradas'] ?? '', // Novo parâmetro
-
-
-
-                            dadosMap['prazo_deficiencias'] ?? '', // Novo parâmetro
-                            dadosMap['nome_fiscal_militar'] ?? '', // Novo parâmetro
-                            dadosMap['postoGraduacaoController'] ?? '',
-                            dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
-                            dadosMap['omMilitarController'] ?? '',
-                            dadosMap['nome_empresa'] ?? '', // Novo parâmetro
-                            dadosMap['cpf_empresa'] ?? '',
-                            dadosMap['testemunha1'] ?? '', // Novo parâmetro
-                            dadosMap['idtestemunha1'] ?? '',
-                            dadosMap['testemunha2'] ?? '',
-                            dadosMap['idtestemunha2'] ?? '', // Novo parâmetro
-                            dadosMap['assinatura1Base64'] ?? '',
-                            dadosMap['assinatura2Base64'] ?? '',
-                            dadosMap['assinatura3Base64'] ?? '',
-                            dadosMap['assinatura4Base64'] ?? '',
-                            imagensBase64, // Aqui passa a lista de imagens
-
-
-                          );
-                          await removerRegistroLocal(dados);
-
-                        },
-                      ),
-                    );
-                  }).toList(),
-                ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("a.informações sobre a detonação",
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          decoration: TextDecoration.underline),
-                    ),
-
-                    SizedBox(height: 20,),
-
-
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-  // Função auxiliar para construir campos de texto
-  Widget buildFormFieldExecucao(String hint, String initialValue, Function(String) onChanged) {
-    return TextField(
-      decoration: InputDecoration(
-        border: OutlineInputBorder(),
-        hintText: hint,
-      ),
-      onChanged: onChanged,
-      controller: TextEditingController(text: initialValue),
-    );
-  }
-  //Formulário Execução detonação
 
   //Formulário Lista de defiências encontradas
   Widget buildIdentificacaoDeficienciaTile() {
@@ -1752,7 +1955,8 @@ List<Map<String, dynamic>> listaApreensao = [];
                       trailing: IconButton(
                         icon: Icon(Icons.send),
                         onPressed: () async {
-                          List<String> imagensBase64 = List<String>.from(dadosMap['imagensBase64'] ?? []);
+                          List<String> imagensBase64 = List<String>.from(
+                              dadosMap['imagensBase64'] ?? []);
 
                           await enviarDadosParaServidor(
                             dadosMap['razaoSocial'] ?? '',
@@ -1763,26 +1967,41 @@ List<Map<String, dynamic>> listaApreensao = [];
                             dadosMap['telefone'] ?? '',
                             dadosMap['telefoneResidencial'] ?? '',
                             dadosMap['cnpj'] ?? '',
+                            dadosMap['referencia'] ?? '',
+                            dadosMap['coordenada'] ?? '',
                             dadosMap['respostaDocumentacao'] ?? '',
                             dadosMap['observacoes'] ?? '',
                             dadosMap['lista_deficiencia'] ?? '',
                             dadosMap['observacoes_gerais'] ?? '',
                             dadosMap['infracao'] ?? '',
-                            dadosMap['qtd_autos_infracao'] ?? '', // Novo parâmetro
-                            dadosMap['qtd_termos_aprensao'] ?? '', // Novo parâmetro
-                            dadosMap['qtd_termos_depositario'] ?? '', // Novo parâmetro
-                            dadosMap['especificar_deficiencias_encontradas'] ?? '', // Novo parâmetro
-                            dadosMap['prazo_deficiencias'] ?? '', // Novo parâmetro
-                            dadosMap['nome_fiscal_militar'] ?? '', // Novo parâmetro
+                            dadosMap['qtd_autos_infracao'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['qtd_termos_aprensao'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['qtd_termos_depositario'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['especificar_deficiencias_encontradas'] ??
+                                '',
+                            // Novo parâmetro
+                            dadosMap['prazo_deficiencias'] ?? '',
+                            // Novo parâmetro
+
+                            dadosMap['nome_fiscal_militar'] ?? '',
+                            // Novo parâmetro
                             dadosMap['postoGraduacaoController'] ?? '',
-                            dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                            dadosMap['idtMilitarController'] ?? '',
+                            // Novo parâmetro
                             dadosMap['omMilitarController'] ?? '',
-                            dadosMap['nome_empresa'] ?? '', // Novo parâmetro
+                            dadosMap['nome_empresa'] ?? '',
+                            // Novo parâmetro
                             dadosMap['cpf_empresa'] ?? '',
-                            dadosMap['testemunha1'] ?? '', // Novo parâmetro
+                            dadosMap['testemunha1'] ?? '',
+                            // Novo parâmetro
                             dadosMap['idtestemunha1'] ?? '',
                             dadosMap['testemunha2'] ?? '',
-                            dadosMap['idtestemunha2'] ?? '', // Novo parâmetro
+                            dadosMap['idtestemunha2'] ?? '',
+                            // Novo parâmetro
+
                             dadosMap['assinatura1Base64'] ?? '',
                             dadosMap['assinatura2Base64'] ?? '',
                             dadosMap['assinatura3Base64'] ?? '',
@@ -1791,7 +2010,6 @@ List<Map<String, dynamic>> listaApreensao = [];
 
                           );
                           await removerRegistroLocal(dados);
-
                         },
                       ),
                     );
@@ -1805,7 +2023,6 @@ List<Map<String, dynamic>> listaApreensao = [];
                     Text("Listar as deficiências uma a uma, enumerando-as."),
                     SizedBox(height: 20,),
                     buildIdentificacaoDeficienciaForm(),
-                    SizedBox(height: 20,),
 
 
                   ],
@@ -1817,6 +2034,7 @@ List<Map<String, dynamic>> listaApreensao = [];
       },
     );
   }
+
   //Construindo o formulário
   Widget buildIdentificacaoDeficienciaForm() {
     return Column(
@@ -1868,12 +2086,13 @@ List<Map<String, dynamic>> listaApreensao = [];
                     return ListTile(
                       title: Text("Registro salvo localmente"),
                       subtitle: Text(
-                        "Nome: ${dadosMap['nome']}\nEmail: ${dadosMap['email']}\nNúmero: ${dadosMap['numero']} \nTermos Apresencao: ${dadosMap['qtd_termos_aprensao']}" ,
+                        "Nome: ${dadosMap['nome']}\nEmail: ${dadosMap['email']}\nNúmero: ${dadosMap['numero']} \nTermos Apresencao: ${dadosMap['qtd_termos_aprensao']}",
                       ),
                       trailing: IconButton(
                         icon: Icon(Icons.send),
                         onPressed: () async {
-                          List<String> imagensBase64 = List<String>.from(dadosMap['imagensBase64'] ?? []);
+                          List<String> imagensBase64 = List<String>.from(
+                              dadosMap['imagensBase64'] ?? []);
 
                           await enviarDadosParaServidor(
                             dadosMap['razaoSocial'] ?? '',
@@ -1884,28 +2103,40 @@ List<Map<String, dynamic>> listaApreensao = [];
                             dadosMap['telefone'] ?? '',
                             dadosMap['telefoneResidencial'] ?? '',
                             dadosMap['cnpj'] ?? '',
+                            dadosMap['referencia'] ?? '',
+                            dadosMap['coordenada'] ?? '',
                             dadosMap['respostaDocumentacao'] ?? '',
                             dadosMap['observacoes'] ?? '',
                             dadosMap['lista_deficiencia'] ?? '',
                             dadosMap['observacoes_gerais'] ?? '',
                             dadosMap['infracao'] ?? '',
-                            dadosMap['qtd_autos_infracao'] ?? '', // Novo parâmetro
-                            dadosMap['qtd_termos_aprensao'] ?? '', // Novo parâmetro
-                            dadosMap['qtd_termos_depositario'] ?? '', // Novo parâmetro
-                            dadosMap['especificar_deficiencias_encontradas'] ?? '', // Novo parâmetro
-                            dadosMap['prazo_deficiencias'] ?? '', // Novo parâmetro
+                            dadosMap['qtd_autos_infracao'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['qtd_termos_aprensao'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['qtd_termos_depositario'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['especificar_deficiencias_encontradas'] ??
+                                '',
+                            // Novo parâmetro
+                            dadosMap['prazo_deficiencias'] ?? '',
+                            // Novo parâmetro
 
-                            dadosMap['nome_fiscal_militar'] ?? '', // Novo parâmetro
+                            dadosMap['nome_fiscal_militar'] ?? '',
+                            // Novo parâmetro
                             dadosMap['postoGraduacaoController'] ?? '',
-                            dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                            dadosMap['idtMilitarController'] ?? '',
+                            // Novo parâmetro
                             dadosMap['omMilitarController'] ?? '',
-                            dadosMap['nome_empresa'] ?? '', // Novo parâmetro
+                            dadosMap['nome_empresa'] ?? '',
+                            // Novo parâmetro
                             dadosMap['cpf_empresa'] ?? '',
-                            dadosMap['testemunha1'] ?? '', // Novo parâmetro
+                            dadosMap['testemunha1'] ?? '',
+                            // Novo parâmetro
                             dadosMap['idtestemunha1'] ?? '',
                             dadosMap['testemunha2'] ?? '',
-                            dadosMap['idtestemunha2'] ?? '', // Novo parâmetro
-
+                            dadosMap['idtestemunha2'] ?? '',
+                            // Novo parâmetro
 
                             dadosMap['assinatura1Base64'] ?? '',
                             dadosMap['assinatura2Base64'] ?? '',
@@ -1915,7 +2146,6 @@ List<Map<String, dynamic>> listaApreensao = [];
 
                           );
                           await removerRegistroLocal(dados);
-
                         },
                       ),
                     );
@@ -1926,10 +2156,10 @@ List<Map<String, dynamic>> listaApreensao = [];
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Demais observações e situações identificadas durante a inspeção"),
+                    Text(
+                        "Demais observações e situações identificadas durante a inspeção"),
                     SizedBox(height: 20,),
                     buildIdentificacaoObservacoesGeraisForm(),
-                    SizedBox(height: 20,),
 
 
                   ],
@@ -1941,13 +2171,14 @@ List<Map<String, dynamic>> listaApreensao = [];
       },
     );
   }
+
   //Construindo o formulário
   Widget buildIdentificacaoObservacoesGeraisForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         buildFormFieldGrande(observacoes_gerais),
-        SizedBox(height: 10,),
+        SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
@@ -1957,22 +2188,42 @@ List<Map<String, dynamic>> listaApreensao = [];
           ],
         ),
         SizedBox(height: 10),
-        Row(
-          children: [
-            Text("Se houve infração, informar:", style: TextStyle(
-              color: Color.fromRGBO(17, 48, 33, 1),
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            )),
-          ],
-        ),
-        SizedBox(height: 10),
-        buildFormFieldComMascara("Qnt de Autos de infração:", qtd_autos_infracao, numeroMask),
-        SizedBox(height: 10,),
-        buildFormFieldComMascara("Qnt de termos de apreensão:", qtd_termos_aprensao, numeroMask),
-        SizedBox(height: 10,),
-        buildFormFieldComMascara("Qnt de termos de fiel depositário:", qtd_termos_depositario, numeroMask),
-        SizedBox(height: 10,),
+        if (infracao.isNotEmpty && infracao[0] == "Sim") ...[
+          Row(
+            children: [
+              Text(
+                "Se houve infração, informar:",
+                style: TextStyle(
+                  color: Color.fromRGBO(17, 48, 33, 1),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10),
+          buildFormFieldComMascara(
+            "Qnt de Autos de infração:",
+            qtd_autos_infracao,
+            numeroMask,
+            readOnly: infracao[0] == "Não",
+          ),
+          SizedBox(height: 10),
+          buildFormFieldComMascara(
+            "Qnt de termos de apreensão:",
+            qtd_termos_aprensao,
+            numeroMask,
+            readOnly: infracao[0] == "Não",
+          ),
+          SizedBox(height: 10),
+          buildFormFieldComMascara(
+            "Qnt de termos de fiel depositário:",
+            qtd_termos_depositario,
+            numeroMask,
+            readOnly: infracao[0] == "Não",
+          ),
+          SizedBox(height: 10),
+        ],
       ],
     );
   }
@@ -2048,11 +2299,15 @@ List<Map<String, dynamic>> listaApreensao = [];
     );
   }
 
- Widget buildFormFieldComMascara(String labelText, TextEditingController controller, MaskTextInputFormatter mask, {bool readOnly = false,}) {
+
+  Widget buildFormFieldComMascaraData(String labelText,
+      TextEditingController controller, MaskTextInputFormatter mask) {
+// Inicializa o campo com a data atual formatada
+    controller.text = getCurrentDateFormatted(); // Define o valor da data
+
     return TextFormField(
       controller: controller,
       inputFormatters: [mask],
-      readOnly: readOnly, // Define se o campo pode ser editado
       decoration: InputDecoration(
         labelText: labelText,
         labelStyle: TextStyle(
@@ -2071,7 +2326,6 @@ List<Map<String, dynamic>> listaApreensao = [];
       style: TextStyle(color: Color.fromRGBO(17, 48, 33, 1)),
     );
   }
-
 
   //Formulário Correção de defiências encontradas
   Widget buildIdentificacaoCorrecaoDeficienciaTile() {
@@ -2120,7 +2374,8 @@ List<Map<String, dynamic>> listaApreensao = [];
                       trailing: IconButton(
                         icon: Icon(Icons.send),
                         onPressed: () async {
-                          List<String> imagensBase64 = List<String>.from(dadosMap['imagensBase64'] ?? []);
+                          List<String> imagensBase64 = List<String>.from(
+                              dadosMap['imagensBase64'] ?? []);
 
                           await enviarDadosParaServidor(
                             dadosMap['razaoSocial'] ?? '',
@@ -2131,30 +2386,41 @@ List<Map<String, dynamic>> listaApreensao = [];
                             dadosMap['telefone'] ?? '',
                             dadosMap['telefoneResidencial'] ?? '',
                             dadosMap['cnpj'] ?? '',
+                            dadosMap['referencia'] ?? '',
+                            dadosMap['coordenada'] ?? '',
                             dadosMap['respostaDocumentacao'] ?? '',
                             dadosMap['observacoes'] ?? '',
                             dadosMap['lista_deficiencia'] ?? '',
                             dadosMap['observacoes_gerais'] ?? '',
                             dadosMap['infracao'] ?? '',
-                            dadosMap['qtd_autos_infracao'] ?? '', // Novo parâmetro
-                            dadosMap['qtd_termos_aprensao'] ?? '', // Novo parâmetro
-                            dadosMap['qtd_termos_depositario'] ?? '', // Novo parâmetro
-                            dadosMap['especificar_deficiencias_encontradas'] ?? '', // Novo parâmetro
+                            dadosMap['qtd_autos_infracao'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['qtd_termos_aprensao'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['qtd_termos_depositario'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['especificar_deficiencias_encontradas'] ??
+                                '',
+                            // Novo parâmetro
 
-
-                            dadosMap['nome_fiscal_militar'] ?? '', // Novo parâmetro
+                            dadosMap['nome_fiscal_militar'] ?? '',
+                            // Novo parâmetro
                             dadosMap['postoGraduacaoController'] ?? '',
-                            dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                            dadosMap['idtMilitarController'] ?? '',
+                            // Novo parâmetro
                             dadosMap['omMilitarController'] ?? '',
-                            dadosMap['nome_empresa'] ?? '', // Novo parâmetro
+                            dadosMap['nome_empresa'] ?? '',
+                            // Novo parâmetro
                             dadosMap['cpf_empresa'] ?? '',
-                            dadosMap['testemunha1'] ?? '', // Novo parâmetro
+                            dadosMap['testemunha1'] ?? '',
+                            // Novo parâmetro
                             dadosMap['idtestemunha1'] ?? '',
                             dadosMap['testemunha2'] ?? '',
-                            dadosMap['idtestemunha2'] ?? '', // Novo parâmetro
+                            dadosMap['idtestemunha2'] ?? '',
+                            // Novo parâmetro
 
-
-                            dadosMap['prazo_deficiencias'] ?? '', // Novo parâmetro
+                            dadosMap['prazo_deficiencias'] ?? '',
+                            // Novo parâmetro
 
                             dadosMap['assinatura1Base64'] ?? '',
                             dadosMap['assinatura2Base64'] ?? '',
@@ -2164,7 +2430,6 @@ List<Map<String, dynamic>> listaApreensao = [];
 
                           );
                           await removerRegistroLocal(dados);
-
                         },
                       ),
                     );
@@ -2177,7 +2442,7 @@ List<Map<String, dynamic>> listaApreensao = [];
                   children: [
                     SizedBox(height: 10,),
                     buildIdentificacaoCorrecaoDeficienciaForm(),
-                    SizedBox(height: 20,),
+
 
                   ],
                 ),
@@ -2188,6 +2453,7 @@ List<Map<String, dynamic>> listaApreensao = [];
       },
     );
   }
+
   //Construindo o formulário
   Widget buildIdentificacaoCorrecaoDeficienciaForm() {
     return Column(
@@ -2218,7 +2484,7 @@ List<Map<String, dynamic>> listaApreensao = [];
             ),
             Expanded(
               child:
-              buildFormField("",prazo_deficiencias),
+              buildFormField("", prazo_deficiencias),
               flex: 2,
             ),
             Expanded(
@@ -2231,8 +2497,10 @@ List<Map<String, dynamic>> listaApreensao = [];
         Row(
           children: [
             Expanded(child:
-            Text("dias para que o fiscalizado providencie a correção das deficiências apontadas no item 4. LISTA DE DEFICIÊNCIAS ENCONTRADAS", style: TextStyle(
-                fontWeight: FontWeight.bold),),),
+            Text(
+              "dias para que o fiscalizado providencie a correção das deficiências apontadas no item 4. LISTA DE DEFICIÊNCIAS ENCONTRADAS",
+              style: TextStyle(
+                  fontWeight: FontWeight.bold),),),
             SizedBox(height: 10),
           ],
         ),
@@ -2263,6 +2531,7 @@ List<Map<String, dynamic>> listaApreensao = [];
       style: TextStyle(color: Color.fromRGBO(17, 48, 33, 1)),
     );
   }
+
   Widget buildFormFieldGrande(TextEditingController controller) {
     return TextFormField(
       controller: controller,
@@ -2283,10 +2552,15 @@ List<Map<String, dynamic>> listaApreensao = [];
     );
   }
   Widget buildFormFieldComMascara(
-      String labelText, TextEditingController controller, MaskTextInputFormatter mask) {
+      String labelText,
+      TextEditingController controller,
+      MaskTextInputFormatter mask, {
+        bool readOnly = false, // Adiciona a opção de bloquear o campo
+      }) {
     return TextFormField(
       controller: controller,
       inputFormatters: [mask],
+      readOnly: readOnly, // Define se o campo pode ser editado
       decoration: InputDecoration(
         labelText: labelText,
         labelStyle: TextStyle(
@@ -2305,7 +2579,9 @@ List<Map<String, dynamic>> listaApreensao = [];
       style: TextStyle(color: Color.fromRGBO(17, 48, 33, 1)),
     );
   }
-  void exibirPopupTermosApreensao(BuildContext context, int qtdTermos , qtdTermosIfracao) {
+
+  void exibirPopupTermosApreensao(BuildContext context, int qtdTermos,
+      qtdTermosIfracao) {
 // Garante que a lista de apreensões tenha pelo menos `qtdTermos` elementos
     while (apreensoes.length < qtdTermos) {
       apreensoes.add({
@@ -2319,7 +2595,8 @@ List<Map<String, dynamic>> listaApreensao = [];
 // Garante que a lista de infrações tenha pelo menos `qtdTermosIfracao` elementos
     while (infracoes.length < qtdTermosIfracao) {
       infracoes.add({
-        "data_hora_infracao": TextEditingController(text: getCurrentDateTimeFormatted()),
+        "data_hora_infracao": TextEditingController(
+            text: getCurrentDateTimeFormatted()),
         "estadoIdSelecionado_infracao": null,
         "cidade_infracao": TextEditingController(),
         "produtos_infracao": [],
@@ -2344,7 +2621,8 @@ List<Map<String, dynamic>> listaApreensao = [];
                       if (apreensoes.isNotEmpty)
                         Column(
                           children: List.generate(qtdTermos, (index) {
-                            return construirFormularioApreensao(index, setState);
+                            return construirFormularioApreensao(
+                                index, setState);
                           }),
                         ),
                       Text("Termos Infração"),
@@ -2372,74 +2650,22 @@ List<Map<String, dynamic>> listaApreensao = [];
         );
       },
     );
+  }
 
-  }
-Widget buildIdentificacaoObservacoesGeraisForm() {
+  Widget construirFormularioInfracao(int index, StateSetter setState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        buildFormFieldGrande(observacoes_gerais),
-        SizedBox(height: 10,),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Expanded(
-              child: buildIdentificacaoObservacoesGeraisOpcoesForm(),
-            ),
-          ],
-        ),
-        SizedBox(height: 10),
-        if (infracao.isNotEmpty && infracao[0] == "Sim") ...[
-          Row(
-            children: [
-              Text(
-                "Se houve infração, informar:",
-                style: TextStyle(
-                  color: Color.fromRGBO(17, 48, 33, 1),
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 10),
-          buildFormFieldComMascara(
-            "Qnt de Autos de infração:",
-            qtd_autos_infracao,
-            numeroMask,
-            readOnly: infracao[0] == "Não",
-          ),
-          SizedBox(height: 10),
-          buildFormFieldComMascara(
-            "Qnt de termos de apreensão:",
-            qtd_termos_aprensao,
-            numeroMask,
-            readOnly: infracao[0] == "Não",
-          ),
-          SizedBox(height: 10),
-          buildFormFieldComMascara(
-            "Qnt de termos de fiel depositário:",
-            qtd_termos_depositario,
-            numeroMask,
-            readOnly: infracao[0] == "Não",
-          ),
-          SizedBox(height: 10),
-        ],
-      ],
-    );
-  }
- Widget construirFormularioInfracao(int index, StateSetter setState) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Data e Hora:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Data e Hora:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         TextField(
           controller: infracoes[index]["data_hora_infracao"],
           decoration: InputDecoration(labelText: "Data e Hora"),
         ),
         SizedBox(height: 10),
 
-        Text('Estado:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Estado:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         DropdownButton<int>(
           value: infracoes[index]["estadoIdSelecionado_infracao"],
           items: estados.map((estado) {
@@ -2456,14 +2682,16 @@ Widget buildIdentificacaoObservacoesGeraisForm() {
         ),
         SizedBox(height: 10),
 
-        Text('Cidade:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Cidade:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         TextField(
           controller: infracoes[index]["cidade_infracao"],
           decoration: InputDecoration(labelText: "Cidade"),
         ),
         SizedBox(height: 10),
 
-        Text('Produtos:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Produtos:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         ListView.builder(
           shrinkWrap: true,
           itemCount: (infracoes[index]["produtos_infracao"] ?? []).length,
@@ -2482,7 +2710,8 @@ Widget buildIdentificacaoObservacoesGeraisForm() {
                     setState(() {
                       if (infracoes[index]["produtos_infracao"] != null &&
                           infracoes[index]["produtos_infracao"].isNotEmpty) {
-                        infracoes[index]["produtos_infracao"].removeAt(prodIndex);
+                        infracoes[index]["produtos_infracao"].removeAt(
+                            prodIndex);
                       }
                     });
                   },
@@ -2511,18 +2740,21 @@ Widget buildIdentificacaoObservacoesGeraisForm() {
       ],
     );
   }
+
   Widget construirFormularioApreensao(int index, StateSetter setState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Data e Hora:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Data e Hora:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         TextField(
           controller: apreensoes[index]["data_hora"],
           decoration: InputDecoration(labelText: "Data e Hora"),
         ),
         SizedBox(height: 10),
 
-        Text('Estado:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Estado:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         DropdownButton<int>(
           value: apreensoes[index]["estadoIdSelecionado"],
           items: estados.map((estado) {
@@ -2539,14 +2771,16 @@ Widget buildIdentificacaoObservacoesGeraisForm() {
         ),
         SizedBox(height: 10),
 
-        Text('Cidade:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Cidade:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         TextField(
           controller: apreensoes[index]["cidade"],
           decoration: InputDecoration(labelText: "Cidade"),
         ),
         SizedBox(height: 10),
 
-        Text('Produtos:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Produtos:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         ListView.builder(
           shrinkWrap: true,
           itemCount: apreensoes[index]["produtos"].length,

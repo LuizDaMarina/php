@@ -48,7 +48,6 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
   List<String> infracao = [];
 
 
-
   //Detonacao_Deficiencias
   final TextEditingController lista_deficiencia = TextEditingController();
 
@@ -83,7 +82,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
   final TextEditingController itdtestemunha2 = TextEditingController();
 
 
- // Listas para armazenar os dados dos formulários múltiplos Apreesão
+  // Listas para armazenar os dados dos formulários múltiplos Apreesão
   List<TextEditingController> data_hora = [];
   List<TextEditingController> cidade = [];
   List<int?> estadoIdSelecionado = [];
@@ -138,7 +137,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
 
     for (int i = 0; i < quantidade; i++) {
       apreensoes.add({
-        "data_hora_infracao": TextEditingController(text: getCurrentDateTimeFormatted()),
+        "data_hora_infracao": TextEditingController(
+            text: getCurrentDateTimeFormatted()),
         "estadoIdSelecionado_infracao": null,
         "cidade_infracao": TextEditingController(),
         "produtos": [
@@ -154,6 +154,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       });
     }
   }
+
   void adicionarProduto(int indexApreensao) {
     apreensoes[indexApreensao]["produtos"].add({
       "produto_infracao": TextEditingController(),
@@ -164,6 +165,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       "obs_infracao": TextEditingController(),
     });
   }
+
   void removerProduto(int indexApreensao, int indexProduto) {
     if (apreensoes[indexApreensao]["produtos"].length > 1) {
       apreensoes[indexApreensao]["produtos"].removeAt(indexProduto);
@@ -193,13 +195,15 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
     infracoes.clear();
     for (int i = 0; i < quantidade; i++) {
       infracoes.add({
-        "data_hora_infracao": TextEditingController(text: getCurrentDateTimeFormatted()),
+        "data_hora_infracao": TextEditingController(
+            text: getCurrentDateTimeFormatted()),
         "estadoIdSelecionado_infracao": null,
         "cidade_infracao": TextEditingController(),
         "produtos_infracao": [], // Inicializa como lista vazia
       });
     }
   }
+
 // Método para adicionar um produto na infração
   void adicionarProdutoInfracao(int indexInfracao) {
     setState(() {
@@ -218,6 +222,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       });
     });
   }
+
 // Método para remover um produto da infração
   void removerProdutoInfracao(int indexInfracao, int indexProduto) {
     setState(() {
@@ -227,14 +232,15 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       }
     });
   }
-  List<File?> imagens = [];
 
+  List<File?> imagens = [];
 
 
   // Controlador para o mapa
   GoogleMapController? mapController;
   LatLng? selecionarLocal;
   LatLng? currentLocation;
+
 // Função para abrir o mapa e permitir que o usuário selecione uma coordenada
 
 // Função para obter a localização atual
@@ -247,7 +253,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       );
       setState(() {
         currentLocation = LatLng(position.latitude, position.longitude);
-        coordenada.text = '${position.latitude}, ${position.longitude}'; // Preenche automaticamente
+        coordenada.text = '${position.latitude}, ${position
+            .longitude}'; // Preenche automaticamente
       });
     } else {
       print("Permissão negada para acessar a localização.");
@@ -261,58 +268,65 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: Text('Selecione a Coordenada'),
-          ),
-          body: GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: currentLocation ?? LatLng(-23.5505, -46.6333), // Posição inicial com a localização atual
-              zoom: 12,
-            ),
-            onMapCreated: (GoogleMapController controller) {
-              mapController = controller;
-            },
-            onTap: (LatLng position) {
-              // Isso será acionado ao clicar no mapa (se quiser pode manter)
-              setState(() {
-                selecionarLocal = position;
-              });
-              coordenada.text = '${position.latitude}, ${position.longitude}';
-            },
-            onLongPress: (LatLng position) {
-              // Isso será acionado ao pressionar o mapa por 2 segundos (Long press)
-              setState(() {
-                selecionarLocal = position;
-              });
-              coordenada.text = '${position.latitude}, ${position.longitude}';
-              Navigator.pop(context, selecionarLocal); // Fecha o mapa e retorna com a coordenada
-            },
-            markers: selecionarLocal != null
-                ? {
-              Marker(
-                markerId: MarkerId('Selecionar'),
-                position: selecionarLocal!,
-              )
-            }
-                : currentLocation != null
-                ? {
-              Marker(
-                markerId: MarkerId('LocalAtual'),
-                position: currentLocation!,
+        builder: (context) =>
+            Scaffold(
+              appBar: AppBar(
+                title: Text('Selecione a Coordenada'),
               ),
-            }
-                : {},
-            myLocationEnabled: true, // Habilita o botão de localização atual
-            myLocationButtonEnabled: true, // Mostra o botão de localização no mapa
-          ),
-        ),
+              body: GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: currentLocation ?? LatLng(-23.5505, -46.6333),
+                  // Posição inicial com a localização atual
+                  zoom: 12,
+                ),
+                onMapCreated: (GoogleMapController controller) {
+                  mapController = controller;
+                },
+                onTap: (LatLng position) {
+                  // Isso será acionado ao clicar no mapa (se quiser pode manter)
+                  setState(() {
+                    selecionarLocal = position;
+                  });
+                  coordenada.text =
+                  '${position.latitude}, ${position.longitude}';
+                },
+                onLongPress: (LatLng position) {
+                  // Isso será acionado ao pressionar o mapa por 2 segundos (Long press)
+                  setState(() {
+                    selecionarLocal = position;
+                  });
+                  coordenada.text =
+                  '${position.latitude}, ${position.longitude}';
+                  Navigator.pop(context,
+                      selecionarLocal); // Fecha o mapa e retorna com a coordenada
+                },
+                markers: selecionarLocal != null
+                    ? {
+                  Marker(
+                    markerId: MarkerId('Selecionar'),
+                    position: selecionarLocal!,
+                  )
+                }
+                    : currentLocation != null
+                    ? {
+                  Marker(
+                    markerId: MarkerId('LocalAtual'),
+                    position: currentLocation!,
+                  ),
+                }
+                    : {},
+                myLocationEnabled: true,
+                // Habilita o botão de localização atual
+                myLocationButtonEnabled: true, // Mostra o botão de localização no mapa
+              ),
+            ),
       ),
     );
 
     if (selecionarLocal != null) {
       // Se o usuário selecionou uma nova posição, as coordenadas serão preenchidas
-      coordenada.text = '${selecionarLocal!.latitude}, ${selecionarLocal!.longitude}';
+      coordenada.text =
+      '${selecionarLocal!.latitude}, ${selecionarLocal!.longitude}';
     }
   }
 
@@ -325,7 +339,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
 
     if (image != null) {
       setState(() {
-        imagens.add(File(image.path));  // Adiciona a imagem selecionada à lista
+        imagens.add(File(image.path)); // Adiciona a imagem selecionada à lista
       });
     }
   }
@@ -367,13 +381,15 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
   static String getCurrentDateTimeFormatted() {
     DateTime now = DateTime.now();
 // Formatar para o formato adequado para o MySQL
-    return DateFormat('yyyy-MM-dd HH:mm:ss').format(now); // Ex: 2025-02-19 16:28:18
+    return DateFormat('yyyy-MM-dd HH:mm:ss').format(
+        now); // Ex: 2025-02-19 16:28:18
   }
 
   String getCurrentDateFormatted() {
     DateTime now = DateTime.now();
     return DateFormat('dd/MM/yyyy').format(now);
   }
+
   Future<String> converterImagemParaBase64(File imagem) async {
     if (imagem != null) {
       List<int> imageBytes = await imagem.readAsBytes();
@@ -387,7 +403,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
         mimeType = 'image/gif';
       }
 
-      return 'data:$mimeType;base64,' + base64String; // Retorna o base64 com o prefixo
+      return 'data:$mimeType;base64,' +
+          base64String; // Retorna o base64 com o prefixo
     }
     return ''; // Caso a imagem seja nula
   }
@@ -400,10 +417,14 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
     final url = Uri.parse('$urlApi$arquivoJson');
 
     // Converter as assinaturas para base64
-    String assinatura1Base64 = await converterAssinaturaparaBase64(_assinatura1);
-    String assinatura2Base64 = await converterAssinaturaparaBase64(_assinatura2);
-    String assinatura3Base64 = await converterAssinaturaparaBase64(_assinatura3);
-    String assinatura4Base64 = await converterAssinaturaparaBase64(_assinatura4);
+    String assinatura1Base64 = await converterAssinaturaparaBase64(
+        _assinatura1);
+    String assinatura2Base64 = await converterAssinaturaparaBase64(
+        _assinatura2);
+    String assinatura3Base64 = await converterAssinaturaparaBase64(
+        _assinatura3);
+    String assinatura4Base64 = await converterAssinaturaparaBase64(
+        _assinatura4);
 
     // Converter as imagens para Base64 com logs de depuração
     List<String> imagensBase64 = [];
@@ -422,7 +443,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
           imagensBase64.add(base64String);
 
           // Debug da imagem processada
-          print("Imagem $contador convertida para Base64: ${base64String.substring(0, 100)}..."); // Exibir os primeiros 100 caracteres
+          print("Imagem $contador convertida para Base64: ${base64String
+              .substring(0, 100)}..."); // Exibir os primeiros 100 caracteres
           contador++;
         } catch (e) {
           print("Erro ao processar a imagem $contador: $e");
@@ -433,7 +455,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       }
     }
 
-// Verificar total de imagens convertidas
+    // Verificar total de imagens convertidas
     print("Total de imagens processadas: ${imagensBase64.length}");
 
     // Printando as variáveis para ver o que está sendo enviado
@@ -443,15 +465,15 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
     print("Assinatura 4 Base64: $assinatura4Base64");
 
 
-
     // Imprimindo todas as imagens em Base64
     print("Imagens Base64:");
     for (var imagem in imagensBase64) {
-      print(imagem); // Aqui você pode também limitar a quantidade de prints se as imagens forem grandes.
+      print(
+          imagem); // Aqui você pode também limitar a quantidade de prints se as imagens forem grandes.
     }
- List<Map<String, dynamic>> listaApreensao = [];
+    List<Map<String, dynamic>> listaApreensao = [];
 
-      // Verifique se a lista apreensoes não está vazia
+    // Verifique se a lista apreensoes não está vazia
     if (apreensoes.isEmpty) {
       print("ERRO: A lista de apreensões está vazia!");
     } else {
@@ -461,7 +483,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
         // Debug: Mostrando o conteúdo de cada apreensão antes da conversão
         print("Apreensão [$i]: ${apreensao.toString()}");
 
-        if (apreensao.containsKey("produtos") && apreensao["produtos"] is List) {
+        if (apreensao.containsKey("produtos") &&
+            apreensao["produtos"] is List) {
           List<Map<String, dynamic>> produtos = (apreensao["produtos"] as List)
               .map((produto) {
             return {
@@ -492,7 +515,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
 
     List<Map<String, dynamic>> listaInfracao = [];
 
-      // Verifique se a lista de infrações não está vazia
+    // Verifique se a lista de infrações não está vazia
     if (infracoes.isEmpty) {
       print("ERRO: A lista de infrações está vazia!");
     } else {
@@ -503,8 +526,10 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
         print("Infração [$i]: ${infracao.toString()}");
 
         // Verifica se a infração contém produtos e se é uma lista válida
-        if (infracao.containsKey("produtos_infracao") && infracao["produtos_infracao"] is List) {
-          List<Map<String, dynamic>> produtos = (infracao["produtos_infracao"] as List)
+        if (infracao.containsKey("produtos_infracao") &&
+            infracao["produtos_infracao"] is List) {
+          List<Map<String,
+              dynamic>> produtos = (infracao["produtos_infracao"] as List)
               .map((produto) {
             return {
               "produto_infracao": produto["produto_infracao"].text,
@@ -516,7 +541,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
             };
           }).toList();
 
-            // Adiciona a infração formatada na lista final
+          // Adiciona a infração formatada na lista final
           listaInfracao.add({
             "data_hora_infracao": infracao["data_hora_infracao"].text,
             "estadoIdSelecionado_infracao": infracao["estadoIdSelecionado_infracao"],
@@ -529,14 +554,15 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       }
     }
 
-      // Debug: Exibir a lista final antes do envio
+    // Debug: Exibir a lista final antes do envio
     print("Lista de infrações JSON: ${jsonEncode(listaInfracao)}");
 
     var connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult == ConnectivityResult.none) {
       // Salvar dados localmente
       await salvarDadosLocalmente();
-      _showDialog(context, "Dados Salvos Localmente", "Os dados foram salvos localmente.");
+      _showDialog(context, "Dados Salvos Localmente",
+          "Os dados foram salvos localmente.");
       return;
     }
 
@@ -560,10 +586,17 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
         'lista_deficiencia': lista_deficiencia.text,
         'observacoes_gerais': observacoes_gerais.text,
         'infracao': jsonEncode(infracao),
-      'qtd_autos_infracao': qtd_autos_infracao.text.isNotEmpty ? qtd_autos_infracao.text.toString() : '0',
-        'qtd_termos_aprensao': qtd_termos_aprensao.text.isNotEmpty ? qtd_termos_aprensao.text.toString() : '0',
-        'qtd_termos_depositario': qtd_termos_depositario.text.isNotEmpty ? qtd_termos_depositario.text.toString() : '0',
-        'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas.text,
+        'qtd_autos_infracao': qtd_autos_infracao.text.isNotEmpty
+            ? qtd_autos_infracao.text.toString()
+            : '0',
+        'qtd_termos_aprensao': qtd_termos_aprensao.text.isNotEmpty
+            ? qtd_termos_aprensao.text.toString()
+            : '0',
+        'qtd_termos_depositario': qtd_termos_depositario.text.isNotEmpty
+            ? qtd_termos_depositario.text.toString()
+            : '0',
+        'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas
+            .text,
         'prazo_deficiencias': prazo_deficiencias.text,
         'nome_fiscal_militar': nome_fiscal_militar.text,
         'fiscal_pg': postoGraduacaoController.text,
@@ -609,16 +642,21 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
     List<String> dadosLocais = prefs.getStringList('dadosLocais') ?? [];
 
     // Verifique se as assinaturas são válidas
-    if (_assinatura1 == null || _assinatura2 == null || _assinatura3 == null || _assinatura4 == null) {
+    if (_assinatura1 == null || _assinatura2 == null || _assinatura3 == null ||
+        _assinatura4 == null) {
       print("Uma ou mais assinaturas estão nulas.");
       return; // Retorna se alguma assinatura for nula
     }
 
     // Converte assinaturas para base64
-    String assinatura1Base64 = await converterAssinaturaparaBase64(_assinatura1);
-    String assinatura2Base64 = await converterAssinaturaparaBase64(_assinatura2);
-    String assinatura3Base64 = await converterAssinaturaparaBase64(_assinatura3);
-    String assinatura4Base64 = await converterAssinaturaparaBase64(_assinatura4);
+    String assinatura1Base64 = await converterAssinaturaparaBase64(
+        _assinatura1);
+    String assinatura2Base64 = await converterAssinaturaparaBase64(
+        _assinatura2);
+    String assinatura3Base64 = await converterAssinaturaparaBase64(
+        _assinatura3);
+    String assinatura4Base64 = await converterAssinaturaparaBase64(
+        _assinatura4);
 
     List<String> imagensBase64 = await Future.wait(
       imagens.map((imagem) => converterImagemParaBase64(imagem!)),
@@ -643,10 +681,16 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       'lista_deficiencia': lista_deficiencia.text,
       'observacoes_gerais': observacoes_gerais.text,
       'infracao': jsonEncode(infracao),
-      'qtd_autos_infracao': qtd_autos_infracao.text.isNotEmpty ? qtd_autos_infracao.text : '0',
-      'qtd_termos_aprensao': qtd_termos_aprensao.text.isNotEmpty ? int.tryParse(qtd_termos_aprensao.text)?.toString() ?? '0' : '0',
-      'qtd_termos_depositario': qtd_termos_depositario.text.isNotEmpty ? qtd_termos_depositario.text : '0',
-      'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas.text,
+      'qtd_autos_infracao': qtd_autos_infracao.text.isNotEmpty
+          ? qtd_autos_infracao.text
+          : '0',
+      'qtd_termos_aprensao': qtd_termos_aprensao.text.isNotEmpty ? int.tryParse(
+          qtd_termos_aprensao.text)?.toString() ?? '0' : '0',
+      'qtd_termos_depositario': qtd_termos_depositario.text.isNotEmpty
+          ? qtd_termos_depositario.text
+          : '0',
+      'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas
+          .text,
       'prazo_deficiencias': prazo_deficiencias.text,
       'nome_fiscal_militar': nome_fiscal_militar.text,
       'postoGraduacaoController': postoGraduacaoController.text,
@@ -685,8 +729,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
     // Limpar dados locais após o envio bem-sucedido de todos os registros
     await limparDadosLocais();
   }
-  Future<void> enviarDadosParaServidor(
-      String razaoSocial,
+
+  Future<void> enviarDadosParaServidor(String razaoSocial,
       String email,
       String data,
       String trcr,
@@ -720,9 +764,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       String assinatura2Base64,
       String assinatura3Base64,
       String assinatura4Base64,
-      List<String> imagensBase64,
-      ) async {
-
+      List<String> imagensBase64,) async {
     String urlApi = Api.url;
     String arquivoJson = "FormFiscalizacao/FormEntidadeDeTiro.php";
     final url = Uri.parse('$urlApi/$arquivoJson');
@@ -756,21 +798,35 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
         'observacoes_gerais': observacoes_gerais,
         'infracao': infracao ?? '',
 
-        'qtd_autos_infracao': qtd_autos_infracao, // Novo parâmetro
-        'qtd_termos_aprensao': qtd_termos_aprensao, // Novo parâmetro
-        'qtd_termos_depositario': qtd_termos_depositario, // Novo parâmetro
-        'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas, // Novo parâmetro
-        'prazo_deficiencias': prazo_deficiencias, // Novo parâmetro
-        'nome_fiscal_militar': nome_fiscal_militar, // Novo parâmetro
-        'fiscal_pg': postoGraduacaoController, // Novo parâmetro
+        'qtd_autos_infracao': qtd_autos_infracao,
+        // Novo parâmetro
+        'qtd_termos_aprensao': qtd_termos_aprensao,
+        // Novo parâmetro
+        'qtd_termos_depositario': qtd_termos_depositario,
+        // Novo parâmetro
+        'especificar_deficiencias_encontradas': especificar_deficiencias_encontradas,
+        // Novo parâmetro
+        'prazo_deficiencias': prazo_deficiencias,
+        // Novo parâmetro
+        'nome_fiscal_militar': nome_fiscal_militar,
+        // Novo parâmetro
+        'fiscal_pg': postoGraduacaoController,
+        // Novo parâmetro
         'idtmilitar': idtMilitarController,
-        'ommilitar': omMilitarController, // Novo parâmetro
-        'nome_empresa': nome_empresa, // Novo parâmetro
-        'cpf_empresa': cpf_empresa, // Novo parâmetro
-        'testemunha1': testemunha1, // Novo parâmetro
-        'itdtestemunha1': itdtestemunha1, // Novo parâmetro
-        'testemunha2': testemunha2, // Novo parâmetro
-        'itdtestemunha2': itdtestemunha2, // Novo parâmetro
+        'ommilitar': omMilitarController,
+        // Novo parâmetro
+        'nome_empresa': nome_empresa,
+        // Novo parâmetro
+        'cpf_empresa': cpf_empresa,
+        // Novo parâmetro
+        'testemunha1': testemunha1,
+        // Novo parâmetro
+        'itdtestemunha1': itdtestemunha1,
+        // Novo parâmetro
+        'testemunha2': testemunha2,
+        // Novo parâmetro
+        'itdtestemunha2': itdtestemunha2,
+        // Novo parâmetro
 
         'assinatura1': assinatura1Base64,
         'assinatura2': assinatura2Base64,
@@ -791,7 +847,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
 
       if (responseData['status'] == 'success') {
         _showDialog(context, "Sucesso", "Cadastro bem-sucedido.");
-        await removerRegistroLocal(jsonEncode({'razaoSocial': razaoSocial, 'email': email}));
+        await removerRegistroLocal(
+            jsonEncode({'razaoSocial': razaoSocial, 'email': email}));
       } else {
         _showDialog(context, "Erro", responseData['message']);
       }
@@ -823,10 +880,14 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
         // Verificando se 'imagensBase64' ou 'baseImagensBase64' existe e imprimindo o tipo
         if (dadosMap.containsKey('imagensBase64')) {
           imagensBase64 = List<String>.from(dadosMap['imagensBase64']);
-          print("Imagens armazenadas em 'imagensBase64'. Número de imagens: ${imagensBase64.length}");
+          print(
+              "Imagens armazenadas em 'imagensBase64'. Número de imagens: ${imagensBase64
+                  .length}");
         } else if (dadosMap.containsKey('baseImagensBase64')) {
           imagensBase64 = List<String>.from(dadosMap['baseImagensBase64']);
-          print("Imagens armazenadas em 'baseImagensBase64'. Número de imagens: ${imagensBase64.length}");
+          print(
+              "Imagens armazenadas em 'baseImagensBase64'. Número de imagens: ${imagensBase64
+                  .length}");
         } else {
           print("Nenhuma imagem encontrada nos dados locais.");
         }
@@ -857,7 +918,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
     super.initState();
     // Adicionar um listener para verificar a conexão
     Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
-      if (result == ConnectivityResult.mobile || result == ConnectivityResult.wifi) {
+      if (result == ConnectivityResult.mobile ||
+          result == ConnectivityResult.wifi) {
         // Enviar os dados salvos localmente quando a conexão é restaurada
         enviarDadosSalvosLocalmente(context);
       }
@@ -866,10 +928,14 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
     // Carregar os dados locais
     carregarDadosLocais();
     _getCurrentLocation(); // Obtém a localização assim que a tela for carregada
-    _assinatura1 = SignatureController(penStrokeWidth: 2, penColor: Colors.black);
-    _assinatura2 = SignatureController(penStrokeWidth: 2, penColor: Colors.black);
-    _assinatura3 = SignatureController(penStrokeWidth: 2, penColor: Colors.black);
-    _assinatura4 = SignatureController(penStrokeWidth: 2, penColor: Colors.black);
+    _assinatura1 =
+        SignatureController(penStrokeWidth: 2, penColor: Colors.black);
+    _assinatura2 =
+        SignatureController(penStrokeWidth: 2, penColor: Colors.black);
+    _assinatura3 =
+        SignatureController(penStrokeWidth: 2, penColor: Colors.black);
+    _assinatura4 =
+        SignatureController(penStrokeWidth: 2, penColor: Colors.black);
 
     idtMilitarController.text = widget.idtMilitar.toString();
     omMilitarController.text = widget.omMilitar.toString();
@@ -887,7 +953,6 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
     idtMilitarController.dispose();
     omMilitarController.dispose();
     postoGraduacaoController.dispose();
-
   }
 
   // Método para exibir diálogos
@@ -910,7 +975,6 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       },
     );
   }
-
 
 
   @override
@@ -979,7 +1043,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(child: buildAssinaturaForm("Fiscal Militar", _assinatura1)),
+                  Expanded(child: buildAssinaturaForm(
+                      "Fiscal Militar", _assinatura1)),
                   SizedBox(width: 10,),
                 ],
               ),
@@ -1009,7 +1074,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
               SizedBox(height: 6),
               Row(
                 children: [
-                  Expanded(child: buildAssinaturaForm("Responsável pela Empresa", _assinatura2)),
+                  Expanded(child: buildAssinaturaForm(
+                      "Responsável pela Empresa", _assinatura2)),
                   SizedBox(width: 10,),
                 ],
               ),
@@ -1028,7 +1094,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(child: buildAssinaturaForm("Testemunha 1", _assinatura3)),
+                  Expanded(
+                      child: buildAssinaturaForm("Testemunha 1", _assinatura3)),
                   SizedBox(width: 10,),
                 ],
               ),
@@ -1046,7 +1113,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
               SizedBox(height: 6,),
               Row(
                 children: [
-                  Expanded(child: buildAssinaturaForm("Testemunha 2", _assinatura4)),
+                  Expanded(
+                      child: buildAssinaturaForm("Testemunha 2", _assinatura4)),
                 ],
               ),
 
@@ -1064,23 +1132,31 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
 
               ElevatedButton(
                   onPressed: () async {
-                    if(_assinatura1.isEmpty || _assinatura2.isEmpty || _assinatura3.isEmpty || _assinatura4.isEmpty ){
+                    if (_assinatura1.isEmpty || _assinatura2.isEmpty ||
+                        _assinatura3.isEmpty || _assinatura4.isEmpty) {
                       List<String> assinaturaemBranco = [];
 
-                      if(_assinatura1.isEmpty) assinaturaemBranco.add("Assinatura 1");
-                      if(_assinatura2.isEmpty) assinaturaemBranco.add("Assinatura 2");
-                      if(_assinatura3.isEmpty) assinaturaemBranco.add("Assinatura 3");
-                      if(_assinatura4.isEmpty) assinaturaemBranco.add("Assinatura 4");
+                      if (_assinatura1.isEmpty) assinaturaemBranco.add(
+                          "Assinatura 1");
+                      if (_assinatura2.isEmpty) assinaturaemBranco.add(
+                          "Assinatura 2");
+                      if (_assinatura3.isEmpty) assinaturaemBranco.add(
+                          "Assinatura 3");
+                      if (_assinatura4.isEmpty) assinaturaemBranco.add(
+                          "Assinatura 4");
 
                       //Assinatura
                       ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Os Seguintes campos estão em Branco  ${assinaturaemBranco.join(", ")} "),)
+                          SnackBar(content: Text(
+                              "Os Seguintes campos estão em Branco  ${assinaturaemBranco
+                                  .join(", ")} "),)
                       );
                     }
-                    else{
+                    else {
                       await enviarDadosSalvosLocalmente(context);
                       ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Assinatura Salva com Sucesso "))
+                          SnackBar(
+                              content: Text("Assinatura Salva com Sucesso "))
                       );
                     }
                   },
@@ -1092,7 +1168,20 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    enviarDadosFormulario(context);
+                    int? qtdTermos = int.tryParse(qtd_termos_aprensao.text);
+                    int? qtdTermosIfracao = int.tryParse(
+                        qtd_autos_infracao.text);
+
+                    // Verifica se o valor é válido (não nulo) e maior que zero
+                    if (qtdTermos != null && qtdTermos > 0 ||
+                        qtdTermosIfracao != null && qtdTermosIfracao > 0) {
+                      exibirPopupTermosApreensao(context, qtdTermos!,
+                          qtdTermosIfracao!); // Passando qtdTermos para o popup
+                    }
+                    else {
+                      enviarDadosFormulario(
+                          context); // Grava diretamente no banco de dados
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     foregroundColor: Colors.white,
@@ -1182,7 +1271,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            TextButton(onPressed: (){
+            TextButton(onPressed: () {
               controller.clear();
             },
                 child: Text("Limpar")
@@ -1236,42 +1325,60 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                         "Nome: ${dadosMap['nome'] ?? 'N/A'}\n"
                             "Email: ${dadosMap['email'] ?? 'N/A'}\n"
                             "Número: ${dadosMap['numero'] ?? 'N/A'}\n"
-                            "Razão Social: ${dadosMap['razaoSocial'] ?? 'N/A'}\n"
+                            "Razão Social: ${dadosMap['razaoSocial'] ??
+                            'N/A'}\n"
                             "Data: ${dadosMap['data'] ?? 'N/A'}\n"
                             "TRCR: ${dadosMap['trcr'] ?? 'N/A'}\n"
                             "Endereço: ${dadosMap['endereco'] ?? 'N/A'}\n"
                             "Telefone: ${dadosMap['telefone'] ?? 'N/A'}\n"
-                            "Telefone Residencial: ${dadosMap['telefoneResidencial'] ?? 'N/A'}\n"
+                            "Telefone Residencial: ${dadosMap['telefoneResidencial'] ??
+                            'N/A'}\n"
                             "CNPJ: ${dadosMap['cnpj'] ?? 'N/A'}\n"
                             "Referência: ${dadosMap['referencia'] ?? 'N/A'}\n"
                             "Coordenada: ${dadosMap['coordenada'] ?? 'N/A'}\n"
-                            "Resposta Empresa: ${dadosMap['respostaEmpresa'] ?? 'N/A'}\n"
+                            "Resposta Empresa: ${dadosMap['respostaEmpresa'] ??
+                            'N/A'}\n"
                             "Observações: ${dadosMap['observacoes'] ?? 'N/A'}\n"
-                            "Lista Deficiência: ${dadosMap['lista_deficiencia'] ?? 'N/A'}\n"
-                            "Observações Gerais: ${dadosMap['observacoes_gerais'] ?? 'N/A'}\n"
+                            "Lista Deficiência: ${dadosMap['lista_deficiencia'] ??
+                            'N/A'}\n"
+                            "Observações Gerais: ${dadosMap['observacoes_gerais'] ??
+                            'N/A'}\n"
                             "Infração: ${dadosMap['infracao'] ?? 'N/A'}\n"
-                            "Quantidade de Autos de Infração: ${dadosMap['qtd_autos_infracao'] ?? 'N/A'}\n"
-                            "Quantidade de Termos de Apreensão: ${dadosMap['qtd_termos_aprensao'] ?? 'N/A'}\n"
-                            "Quantidade de Termos de Depositário: ${dadosMap['qtd_termos_depositario'] ?? 'N/A'}\n"
-                            "Especificar Deficiências Encontradas: ${dadosMap['especificar_deficiencias_encontradas'] ?? 'N/A'}\n"
-                            "Nome Fiscal Militar: ${dadosMap['nome_fiscal_militar'] ?? 'N/A'}\n"
+                            "Quantidade de Autos de Infração: ${dadosMap['qtd_autos_infracao'] ??
+                            'N/A'}\n"
+                            "Quantidade de Termos de Apreensão: ${dadosMap['qtd_termos_aprensao'] ??
+                            'N/A'}\n"
+                            "Quantidade de Termos de Depositário: ${dadosMap['qtd_termos_depositario'] ??
+                            'N/A'}\n"
+                            "Especificar Deficiências Encontradas: ${dadosMap['especificar_deficiencias_encontradas'] ??
+                            'N/A'}\n"
+                            "Nome Fiscal Militar: ${dadosMap['nome_fiscal_militar'] ??
+                            'N/A'}\n"
                             "CPF Empresa: ${dadosMap['cpf_empresa'] ?? 'N/A'}\n"
-                            "Testemunha 1: ${dadosMap['testemunha1'] ?? 'N/A'}\n"
+                            "Testemunha 1: ${dadosMap['testemunha1'] ??
+                            'N/A'}\n"
                             "ITD : ${dadosMap['itdtestemunha1'] ?? 'N/A'}\n"
-                            "Testemunha 2: ${dadosMap['testemunha2'] ?? 'N/A'}\n"
+                            "Testemunha 2: ${dadosMap['testemunha2'] ??
+                            'N/A'}\n"
                             "ITD 2: ${dadosMap['itdtestemunha2'] ?? 'N/A'}\n"
                             "Infração: ${dadosMap['infracao'] ?? 'N/A'}\n"
-                            "Assinatura 1 (Base64): ${dadosMap['assinatura1Base64'] ?? 'N/A'}\n"
-                            "Assinatura 2 (Base64): ${dadosMap['assinatura2Base64'] ?? 'N/A'}\n"
-                            "Assinatura 3 (Base64): ${dadosMap['assinatura3Base64'] ?? 'N/A'}\n"
-                            "Assinatura 4 (Base64): ${dadosMap['assinatura4Base64'] ?? 'N/A'}\n"
+                            "Assinatura 1 (Base64): ${dadosMap['assinatura1Base64'] ??
+                            'N/A'}\n"
+                            "Assinatura 2 (Base64): ${dadosMap['assinatura2Base64'] ??
+                            'N/A'}\n"
+                            "Assinatura 3 (Base64): ${dadosMap['assinatura3Base64'] ??
+                            'N/A'}\n"
+                            "Assinatura 4 (Base64): ${dadosMap['assinatura4Base64'] ??
+                            'N/A'}\n"
                             "Imagens (Base64):\n" +
                             "Imagens (Base64):\n" +
-                            (dadosMap['imagens'] != null && dadosMap['imagens'] is List
+                            (dadosMap['imagens'] != null &&
+                                dadosMap['imagens'] is List
                                 ? List<String>.from(dadosMap['imagens'])
                                 .asMap()
                                 .entries
-                                .map((entry) => "  Imagem ${entry.key + 1}: ${entry.value.substring(0, 100)}...")
+                                .map((entry) => "  Imagem ${entry.key +
+                                1}: ${entry.value.substring(0, 100)}...")
                                 .join("\n")
                                 : "Nenhuma imagem disponível.") +
                             "\n",
@@ -1285,21 +1392,25 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                             List<String> imagensBase64 = [];
 
                             // Verifica se 'imagensBase64' existe e é uma lista
-                            if (dadosMap['imagens'] != null && dadosMap['imagens'] is List) {
-                              imagensBase64 = List<String>.from(dadosMap['imagens']);
+                            if (dadosMap['imagens'] != null &&
+                                dadosMap['imagens'] is List) {
+                              imagensBase64 =
+                              List<String>.from(dadosMap['imagens']);
 
                               // Adiciona nomes às imagens
                               imagensBase64 = imagensBase64
                                   .asMap()
                                   .entries
-                                  .map((entry) => "Imagem_${entry.key + 1}: ${entry.value}")
+                                  .map((entry) => "Imagem_${entry.key +
+                                  1}: ${entry.value}")
                                   .toList();
                             }
 
                             // Debug: Exibe as imagens no console
                             print("Imagens encontradas para envio:");
                             imagensBase64.forEach((imagem) {
-                              print(imagem.substring(0, 100)); // Exibe apenas os primeiros 100 caracteres
+                              print(imagem.substring(0,
+                                  100)); // Exibe apenas os primeiros 100 caracteres
                             });
 
                             // Chama o método que envia os dados para o servidor
@@ -1319,13 +1430,23 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                                 dadosMap['lista_deficiencia'] ?? '',
                                 dadosMap['observacoes_gerais'] ?? '',
                                 dadosMap['infracao'] ?? '',
-                                dadosMap['qtd_autos_infracao']?.isNotEmpty == true ? dadosMap['qtd_autos_infracao'] : '0',
-                                dadosMap['qtd_termos_aprensao']?.isNotEmpty == true ? dadosMap['qtd_termos_aprensao'] : '0',
-                                dadosMap['qtd_termos_depositario']?.isNotEmpty == true ? dadosMap['qtd_termos_depositario'] : '0',
-                                dadosMap['especificar_deficiencias_encontradas'] ?? '',
+                                dadosMap['qtd_autos_infracao']?.isNotEmpty ==
+                                    true ? dadosMap['qtd_autos_infracao'] : '0',
+                                dadosMap['qtd_termos_aprensao']?.isNotEmpty ==
+                                    true
+                                    ? dadosMap['qtd_termos_aprensao']
+                                    : '0',
+                                dadosMap['qtd_termos_depositario']
+                                    ?.isNotEmpty == true
+                                    ? dadosMap['qtd_termos_depositario']
+                                    : '0',
+                                dadosMap['especificar_deficiencias_encontradas'] ??
+                                    '',
                                 dadosMap['prazo_deficiencias'] ?? '',
-                                dadosMap['nome_fiscal_militar'] ?? '',dadosMap['postoGraduacaoController'] ?? '',
-                                dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                                dadosMap['nome_fiscal_militar'] ?? '',
+                                dadosMap['postoGraduacaoController'] ?? '',
+                                dadosMap['idtMilitarController'] ?? '',
+                                // Novo parâmetro
                                 dadosMap['omMilitarController'] ?? '',
                                 dadosMap['nome_empresa'] ?? '',
                                 dadosMap['cpf_empresa'] ?? '',
@@ -1342,7 +1463,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
 
 
                             // Após o envio, remove o registro local
-                            print("Dados enviados com sucesso! Removendo registro local...");
+                            print(
+                                "Dados enviados com sucesso! Removendo registro local...");
                             await removerRegistroLocal(dados);
                           } catch (error, stackTrace) {
                             // Em caso de erro, exibe a mensagem e a pilha de erro
@@ -1403,7 +1525,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
             SizedBox(width: 10,),
             Expanded(
               flex: 1,
-              child: buildFormFieldComMascara("Telefone Residencial:", telefoneResidencial, telefoneMask),
+              child: buildFormFieldComMascara(
+                  "Telefone Residencial:", telefoneResidencial, telefoneMask),
             ),
           ],
         ),
@@ -1412,7 +1535,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
         SizedBox(height: 10),
         buildFormFieldComMascaraData("Data:", data, dataMask),
         SizedBox(height: 10),
-        buildFormFieldComMascara("Ponto de refêrencia:", referencia, letrasMask),
+        buildFormFieldComMascara(
+            "Ponto de refêrencia:", referencia, letrasMask),
         SizedBox(height: 10),
         buildFormFieldComMascara("Coordenada:", coordenada, coordenadaMask),
         ElevatedButton(
@@ -1469,16 +1593,21 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                       trailing: IconButton(
                         icon: Icon(Icons.send),
                         onPressed: () async {
-                          List<String> imagensBase64 = dadosMap.containsKey('imagensBase64') && dadosMap['imagensBase64'] is List
+                          List<String> imagensBase64 = dadosMap.containsKey(
+                              'imagensBase64') &&
+                              dadosMap['imagensBase64'] is List
                               ? List<String>.from(dadosMap['imagensBase64'])
                               : [];
-                          print("Imagens Base64 para envio: ${imagensBase64.length}");
+                          print("Imagens Base64 para envio: ${imagensBase64
+                              .length}");
 
 
                           // Adicionar debug para verificar as imagens recuperadas
-                          print("Imagens recuperadas (Base64): ${imagensBase64.length} imagens.");
+                          print("Imagens recuperadas (Base64): ${imagensBase64
+                              .length} imagens.");
                           for (int i = 0; i < imagensBase64.length; i++) {
-                            print("Imagem $i: ${imagensBase64[i].substring(0, 100)}..."); // Mostra apenas o início da string
+                            print("Imagem $i: ${imagensBase64[i].substring(0,
+                                100)}..."); // Mostra apenas o início da string
                           }
 
                           try {
@@ -1501,11 +1630,13 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                               dadosMap['qtd_autos_infracao'] ?? '',
                               dadosMap['qtd_termos_aprensao'] ?? '',
                               dadosMap['qtd_termos_depositario'] ?? '',
-                              dadosMap['especificar_deficiencias_encontradas'] ?? '',
+                              dadosMap['especificar_deficiencias_encontradas'] ??
+                                  '',
                               dadosMap['prazo_deficiencias'] ?? '',
                               dadosMap['nome_fiscal_militar'] ?? '',
                               dadosMap['postoGraduacaoController'] ?? '',
-                              dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                              dadosMap['idtMilitarController'] ?? '',
+                              // Novo parâmetro
                               dadosMap['omMilitarController'] ?? '',
                               dadosMap['nome_empresa'] ?? '',
                               dadosMap['cpf_empresa'] ?? '',
@@ -1530,45 +1661,51 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                   }).toList(),
                 ),
               Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          buildIdentificacaoEmpresaForm(),
-        SizedBox(height: 20),
-        SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-       onPressed: () {
-                    int? qtdTermos = int.tryParse(qtd_termos_aprensao.text);
-                    int? qtdTermosIfracao = int.tryParse(qtd_autos_infracao.text);
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    buildIdentificacaoEmpresaForm(),
+                    SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          int? qtdTermos = int.tryParse(
+                              qtd_termos_aprensao.text);
+                          int? qtdTermosIfracao = int.tryParse(
+                              qtd_autos_infracao.text);
 
-                    // Verifica se o valor é válido (não nulo) e maior que zero
-                    if (qtdTermos != null && qtdTermos > 0 || qtdTermosIfracao != null && qtdTermosIfracao > 0) {
-                      exibirPopupTermosApreensao(context, qtdTermos!, qtdTermosIfracao!); // Passando qtdTermos para o popup
-                    }
-                    else {
-                      enviarDadosFormulario(context); // Grava diretamente no banco de dados
-                    }
-                  },
-        style: ElevatedButton.styleFrom(
-        foregroundColor: Colors.white,
-        backgroundColor: Colors.green,
-        shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10.0),
-        ),
-        padding: EdgeInsets.symmetric(vertical: 15.0),
-        ),
-        child: Text(
-        "Salvar dados",
-        style: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-        ),
-        ),
-        ),
+                          // Verifica se o valor é válido (não nulo) e maior que zero
+                          if (qtdTermos != null && qtdTermos > 0 ||
+                              qtdTermosIfracao != null &&
+                                  qtdTermosIfracao > 0) {
+                            exibirPopupTermosApreensao(context, qtdTermos!,
+                                qtdTermosIfracao!); // Passando qtdTermos para o popup
+                          }
+                          else {
+                            enviarDadosFormulario(
+                                context); // Grava diretamente no banco de dados
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.green,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.0),
+                          ),
+                          padding: EdgeInsets.symmetric(vertical: 15.0),
+                        ),
+                        child: Text(
+                          "Salvar dados",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
 
-        ),
+                    ),
                   ],
                 ),
 
@@ -1585,7 +1722,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
     List<String> perguntas = [
       "O Certificado de Registro encontra-se dentro da validade?",
       " O Clube de Tiro (CT) está a uma distância superior a 1 (um) Km em relação a estabelecimentos de ensino públicos ou privados? (Vide prazo previsto no §1º do Art. 38 do Dec nº 11.615/2023).",
-      "As atividades exercidas pelo Clube de Tiro estão de acordo com o previsto/autorizado no CR?",
+      /*"As atividades exercidas pelo Clube de Tiro estão de acordo com o previsto/autorizado no CR?",
       "O horário de funcionamento segue o previsto das 06hs às 22hs?",
       "As medidas de segurança para guarda do acervo seguem o previsto no Anexo G da Port nº 166 COLOG/2023?",
       "Existe procedimento escrito e assinado (norma) pelo representante legal do CT sobre as condições de uso do armamento do CT?",
@@ -1617,6 +1754,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       "O ET possui controle de entrada de atiradores?",
       "É cumprido o que prescreve o plano de segurança do ET?",
       "Existe norma de segurança para que sejam cumpridas pelos atiradores, com assinatura do responsável técnico? (Ex: obrigatório o uso de óculos, abafadores, armas abertas, etc?)",
+    */
     ];
     if (respostaEmpresa.length < perguntas.length) {
       respostaEmpresa = List.generate(perguntas.length, (index) => "");
@@ -1655,7 +1793,9 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                   child: RadioListTile<String>(
                     title: Text("Sim"),
                     value: "Sim",
-                    groupValue: respostaEmpresa.length > index ? respostaEmpresa[index] : null,
+                    groupValue: respostaEmpresa.length > index
+                        ? respostaEmpresa[index]
+                        : null,
                     onChanged: (value) {
                       setState(() {
                         if (respostaEmpresa.length > index) {
@@ -1671,7 +1811,27 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                   child: RadioListTile<String>(
                     title: Text("Não"),
                     value: "Não",
-                    groupValue: respostaEmpresa.length > index ? respostaEmpresa[index] : null,
+                    groupValue: respostaEmpresa.length > index
+                        ? respostaEmpresa[index]
+                        : null,
+                    onChanged: (value) {
+                      setState(() {
+                        if (respostaEmpresa.length > index) {
+                          respostaEmpresa[index] = value;
+                        } else {
+                          respostaEmpresa.add(value);
+                        }
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: RadioListTile<String>(
+                    title: Text("Não se aplica"),
+                    value: "Não se aplica",
+                    groupValue: respostaEmpresa.length > index
+                        ? respostaEmpresa[index]
+                        : null,
                     onChanged: (value) {
                       setState(() {
                         if (respostaEmpresa.length > index) {
@@ -1700,7 +1860,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                 "Detalhes da Observação",
                 observacoes.length > index ? observacoes[index] : '',
                 index, // Passa o index para a função
-                    (String value) { // Garantir que o tipo da função seja String
+                    (
+                    String value) { // Garantir que o tipo da função seja String
                   if (observacoes.length > index) {
                     observacoes[index] = value;
                   } else {
@@ -1715,9 +1876,28 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
     );
   }
 
-
+  // Função auxiliar para construir campos de texto
+  Widget buildFormFieldDocumental(String hint, String initialValue, int index, Function(String) onChanged) {
+    return TextField(
+      decoration: InputDecoration(
+        border: OutlineInputBorder(),
+        hintText: "Não se Aplica",
+      ),
+      onChanged: (value) {
+        // Verifica se o campo foi deixado em branco ou não
+        if (value.isEmpty && respostaEmpresa.length <= index) {
+          // Se o campo foi deixado em branco, adicione "Não se Aplica"
+          onChanged("S/A");
+        } else {
+          // Caso contrário, mantém o valor informado
+          onChanged(value);
+        }
+      },
+      controller: TextEditingController(text: initialValue.isEmpty ? "S/A" : initialValue),    );
+  }
   // Função para construir o campo de entrada
-  Widget buildFormFieldEmpresa(String hint, String initialValue, int index, Function(String) onChanged) {
+  Widget buildFormFieldEmpresa(String hint, String initialValue, int index,
+      Function(String) onChanged) {
     return TextField(
       decoration: InputDecoration(
         border: OutlineInputBorder(),
@@ -1733,7 +1913,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
           onChanged(value);
         }
       },
-      controller: TextEditingController(text: initialValue.isEmpty ? "Não se Aplica" : initialValue),
+      controller: TextEditingController(
+          text: initialValue.isEmpty ? "Não se Aplica" : initialValue),
 
     );
   }
@@ -1783,7 +1964,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                       trailing: IconButton(
                         icon: Icon(Icons.send),
                         onPressed: () async {
-                          List<String> imagensBase64 = List<String>.from(dadosMap['imagensBase64'] ?? []);
+                          List<String> imagensBase64 = List<String>.from(
+                              dadosMap['imagensBase64'] ?? []);
 
                           await enviarDadosParaServidor(
                             dadosMap['razaoSocial'] ?? '',
@@ -1801,22 +1983,33 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                             dadosMap['lista_deficiencia'] ?? '',
                             dadosMap['observacoes_gerais'] ?? '',
                             dadosMap['infracao'] ?? '',
-                            dadosMap['qtd_autos_infracao'] ?? '', // Novo parâmetro
-                            dadosMap['qtd_termos_aprensao'] ?? '', // Novo parâmetro
-                            dadosMap['qtd_termos_depositario'] ?? '', // Novo parâmetro
-                            dadosMap['especificar_deficiencias_encontradas'] ?? '', // Novo parâmetro
-                            dadosMap['prazo_deficiencias'] ?? '', // Novo parâmetro
+                            dadosMap['qtd_autos_infracao'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['qtd_termos_aprensao'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['qtd_termos_depositario'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['especificar_deficiencias_encontradas'] ??
+                                '',
+                            // Novo parâmetro
+                            dadosMap['prazo_deficiencias'] ?? '',
+                            // Novo parâmetro
 
-                            dadosMap['nome_fiscal_militar'] ?? '', // Novo parâmetro
+                            dadosMap['nome_fiscal_militar'] ?? '',
+                            // Novo parâmetro
                             dadosMap['postoGraduacaoController'] ?? '',
-                            dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                            dadosMap['idtMilitarController'] ?? '',
+                            // Novo parâmetro
                             dadosMap['omMilitarController'] ?? '',
-                            dadosMap['nome_empresa'] ?? '', // Novo parâmetro
+                            dadosMap['nome_empresa'] ?? '',
+                            // Novo parâmetro
                             dadosMap['cpf_empresa'] ?? '',
-                            dadosMap['testemunha1'] ?? '', // Novo parâmetro
+                            dadosMap['testemunha1'] ?? '',
+                            // Novo parâmetro
                             dadosMap['itdtestemunha1'] ?? '',
                             dadosMap['testemunha2'] ?? '',
-                            dadosMap['itdtestemunha2'] ?? '', // Novo parâmetro
+                            dadosMap['itdtestemunha2'] ?? '',
+                            // Novo parâmetro
 
                             dadosMap['assinatura1Base64'] ?? '',
                             dadosMap['assinatura2Base64'] ?? '',
@@ -1826,7 +2019,6 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
 
                           );
                           await removerRegistroLocal(dados);
-
                         },
                       ),
                     );
@@ -1851,6 +2043,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       },
     );
   }
+
   //Construindo o formulário
   Widget buildIdentificacaoDeficienciaForm() {
     return Column(
@@ -1902,12 +2095,13 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                     return ListTile(
                       title: Text("Registro salvo localmente"),
                       subtitle: Text(
-                        "Nome: ${dadosMap['nome']}\nEmail: ${dadosMap['email']}\nNúmero: ${dadosMap['numero']} \nTermos Apresencao: ${dadosMap['qtd_termos_aprensao']}" ,
+                        "Nome: ${dadosMap['nome']}\nEmail: ${dadosMap['email']}\nNúmero: ${dadosMap['numero']} \nTermos Apresencao: ${dadosMap['qtd_termos_aprensao']}",
                       ),
                       trailing: IconButton(
                         icon: Icon(Icons.send),
                         onPressed: () async {
-                          List<String> imagensBase64 = List<String>.from(dadosMap['imagensBase64'] ?? []);
+                          List<String> imagensBase64 = List<String>.from(
+                              dadosMap['imagensBase64'] ?? []);
 
                           await enviarDadosParaServidor(
                             dadosMap['razaoSocial'] ?? '',
@@ -1925,22 +2119,33 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                             dadosMap['lista_deficiencia'] ?? '',
                             dadosMap['observacoes_gerais'] ?? '',
                             dadosMap['infracao'] ?? '',
-                            dadosMap['qtd_autos_infracao'] ?? '', // Novo parâmetro
-                            dadosMap['qtd_termos_aprensao'] ?? '', // Novo parâmetro
-                            dadosMap['qtd_termos_depositario'] ?? '', // Novo parâmetro
-                            dadosMap['especificar_deficiencias_encontradas'] ?? '', // Novo parâmetro
-                            dadosMap['prazo_deficiencias'] ?? '', // Novo parâmetro
+                            dadosMap['qtd_autos_infracao'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['qtd_termos_aprensao'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['qtd_termos_depositario'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['especificar_deficiencias_encontradas'] ??
+                                '',
+                            // Novo parâmetro
+                            dadosMap['prazo_deficiencias'] ?? '',
+                            // Novo parâmetro
 
-                            dadosMap['nome_fiscal_militar'] ?? '', // Novo parâmetro
+                            dadosMap['nome_fiscal_militar'] ?? '',
+                            // Novo parâmetro
                             dadosMap['postoGraduacaoController'] ?? '',
-                            dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                            dadosMap['idtMilitarController'] ?? '',
+                            // Novo parâmetro
                             dadosMap['omMilitarController'] ?? '',
-                            dadosMap['nome_empresa'] ?? '', // Novo parâmetro
+                            dadosMap['nome_empresa'] ?? '',
+                            // Novo parâmetro
                             dadosMap['cpf_empresa'] ?? '',
-                            dadosMap['testemunha1'] ?? '', // Novo parâmetro
+                            dadosMap['testemunha1'] ?? '',
+                            // Novo parâmetro
                             dadosMap['itdtestemunha1'] ?? '',
                             dadosMap['testemunha2'] ?? '',
-                            dadosMap['itdtestemunha2'] ?? '', // Novo parâmetro
+                            dadosMap['itdtestemunha2'] ?? '',
+                            // Novo parâmetro
 
                             dadosMap['assinatura1Base64'] ?? '',
                             dadosMap['assinatura2Base64'] ?? '',
@@ -1950,7 +2155,6 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
 
                           );
                           await removerRegistroLocal(dados);
-
                         },
                       ),
                     );
@@ -1961,7 +2165,8 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Demais observações e situações identificadas durante a inspeção"),
+                    Text(
+                        "Demais observações e situações identificadas durante a inspeção"),
                     SizedBox(height: 20,),
                     buildIdentificacaoObservacoesGeraisForm(),
 
@@ -1975,13 +2180,14 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       },
     );
   }
+
   //Construindo o formulário
- Widget buildIdentificacaoObservacoesGeraisForm() {
+  Widget buildIdentificacaoObservacoesGeraisForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         buildFormFieldGrande(observacoes_gerais),
-        SizedBox(height: 10,),
+        SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
@@ -2030,7 +2236,7 @@ class _FormEntidadesDeTiroState extends State<FormEntidadesDeTiro> {
       ],
     );
   }
-Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
+  Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
     List<String> perguntas = ["Houve infração"];
 
     if (infracao.length < perguntas.length) {
@@ -2103,7 +2309,8 @@ Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
   }
 
 
-  Widget buildFormFieldComMascaraData(String labelText, TextEditingController controller, MaskTextInputFormatter mask) {
+  Widget buildFormFieldComMascaraData(String labelText,
+      TextEditingController controller, MaskTextInputFormatter mask) {
 // Inicializa o campo com a data atual formatada
     controller.text = getCurrentDateFormatted(); // Define o valor da data
 
@@ -2176,7 +2383,8 @@ Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
                       trailing: IconButton(
                         icon: Icon(Icons.send),
                         onPressed: () async {
-                          List<String> imagensBase64 = List<String>.from(dadosMap['imagensBase64'] ?? []);
+                          List<String> imagensBase64 = List<String>.from(
+                              dadosMap['imagensBase64'] ?? []);
 
                           await enviarDadosParaServidor(
                             dadosMap['razaoSocial'] ?? '',
@@ -2194,23 +2402,34 @@ Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
                             dadosMap['lista_deficiencia'] ?? '',
                             dadosMap['observacoes_gerais'] ?? '',
                             dadosMap['infracao'] ?? '',
-                            dadosMap['qtd_autos_infracao'] ?? '', // Novo parâmetro
-                            dadosMap['qtd_termos_aprensao'] ?? '', // Novo parâmetro
-                            dadosMap['qtd_termos_depositario'] ?? '', // Novo parâmetro
-                            dadosMap['especificar_deficiencias_encontradas'] ?? '', // Novo parâmetro
+                            dadosMap['qtd_autos_infracao'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['qtd_termos_aprensao'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['qtd_termos_depositario'] ?? '',
+                            // Novo parâmetro
+                            dadosMap['especificar_deficiencias_encontradas'] ??
+                                '',
+                            // Novo parâmetro
 
-                            dadosMap['nome_fiscal_militar'] ?? '', // Novo parâmetro
+                            dadosMap['nome_fiscal_militar'] ?? '',
+                            // Novo parâmetro
                             dadosMap['postoGraduacaoController'] ?? '',
-                            dadosMap['idtMilitarController'] ?? '', // Novo parâmetro
+                            dadosMap['idtMilitarController'] ?? '',
+                            // Novo parâmetro
                             dadosMap['omMilitarController'] ?? '',
-                            dadosMap['nome_empresa'] ?? '', // Novo parâmetro
+                            dadosMap['nome_empresa'] ?? '',
+                            // Novo parâmetro
                             dadosMap['cpf_empresa'] ?? '',
-                            dadosMap['testemunha1'] ?? '', // Novo parâmetro
+                            dadosMap['testemunha1'] ?? '',
+                            // Novo parâmetro
                             dadosMap['itdtestemunha1'] ?? '',
                             dadosMap['testemunha2'] ?? '',
-                            dadosMap['itdtestemunha2'] ?? '', // Novo parâmetro
+                            dadosMap['itdtestemunha2'] ?? '',
+                            // Novo parâmetro
 
-                            dadosMap['prazo_deficiencias'] ?? '', // Novo parâmetro
+                            dadosMap['prazo_deficiencias'] ?? '',
+                            // Novo parâmetro
 
                             dadosMap['assinatura1Base64'] ?? '',
                             dadosMap['assinatura2Base64'] ?? '',
@@ -2220,7 +2439,6 @@ Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
 
                           );
                           await removerRegistroLocal(dados);
-
                         },
                       ),
                     );
@@ -2244,6 +2462,7 @@ Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
       },
     );
   }
+
   //Construindo o formulário
   Widget buildIdentificacaoCorrecaoDeficienciaForm() {
     return Column(
@@ -2274,7 +2493,7 @@ Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
             ),
             Expanded(
               child:
-              buildFormField("",prazo_deficiencias),
+              buildFormField("", prazo_deficiencias),
               flex: 2,
             ),
             Expanded(
@@ -2287,8 +2506,10 @@ Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
         Row(
           children: [
             Expanded(child:
-            Text("dias para que o fiscalizado providencie a correção das deficiências apontadas no item 4. LISTA DE DEFICIÊNCIAS ENCONTRADAS", style: TextStyle(
-                fontWeight: FontWeight.bold),),),
+            Text(
+              "dias para que o fiscalizado providencie a correção das deficiências apontadas no item 4. LISTA DE DEFICIÊNCIAS ENCONTRADAS",
+              style: TextStyle(
+                  fontWeight: FontWeight.bold),),),
             SizedBox(height: 10),
           ],
         ),
@@ -2319,6 +2540,7 @@ Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
       style: TextStyle(color: Color.fromRGBO(17, 48, 33, 1)),
     );
   }
+
   Widget buildFormFieldGrande(TextEditingController controller) {
     return TextFormField(
       controller: controller,
@@ -2338,7 +2560,12 @@ Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
       style: TextStyle(color: Color.fromRGBO(17, 48, 33, 1)),
     );
   }
- Widget buildFormFieldComMascara(String labelText, TextEditingController controller, MaskTextInputFormatter mask, {bool readOnly = false,}) {
+  Widget buildFormFieldComMascara(
+      String labelText,
+      TextEditingController controller,
+      MaskTextInputFormatter mask, {
+        bool readOnly = false, // Adiciona a opção de bloquear o campo
+      }) {
     return TextFormField(
       controller: controller,
       inputFormatters: [mask],
@@ -2362,7 +2589,8 @@ Widget buildIdentificacaoObservacoesGeraisOpcoesForm() {
     );
   }
 
-void exibirPopupTermosApreensao(BuildContext context, int qtdTermos , qtdTermosIfracao) {
+  void exibirPopupTermosApreensao(BuildContext context, int qtdTermos,
+      qtdTermosIfracao) {
 // Garante que a lista de apreensões tenha pelo menos `qtdTermos` elementos
     while (apreensoes.length < qtdTermos) {
       apreensoes.add({
@@ -2376,7 +2604,8 @@ void exibirPopupTermosApreensao(BuildContext context, int qtdTermos , qtdTermosI
 // Garante que a lista de infrações tenha pelo menos `qtdTermosIfracao` elementos
     while (infracoes.length < qtdTermosIfracao) {
       infracoes.add({
-        "data_hora_infracao": TextEditingController(text: getCurrentDateTimeFormatted()),
+        "data_hora_infracao": TextEditingController(
+            text: getCurrentDateTimeFormatted()),
         "estadoIdSelecionado_infracao": null,
         "cidade_infracao": TextEditingController(),
         "produtos_infracao": [],
@@ -2401,7 +2630,8 @@ void exibirPopupTermosApreensao(BuildContext context, int qtdTermos , qtdTermosI
                       if (apreensoes.isNotEmpty)
                         Column(
                           children: List.generate(qtdTermos, (index) {
-                            return construirFormularioApreensao(index, setState);
+                            return construirFormularioApreensao(
+                                index, setState);
                           }),
                         ),
                       Text("Termos Infração"),
@@ -2429,20 +2659,22 @@ void exibirPopupTermosApreensao(BuildContext context, int qtdTermos , qtdTermosI
         );
       },
     );
-
   }
- Widget construirFormularioInfracao(int index, StateSetter setState) {
+
+  Widget construirFormularioInfracao(int index, StateSetter setState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Data e Hora:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Data e Hora:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         TextField(
           controller: infracoes[index]["data_hora_infracao"],
           decoration: InputDecoration(labelText: "Data e Hora"),
         ),
         SizedBox(height: 10),
 
-        Text('Estado:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Estado:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         DropdownButton<int>(
           value: infracoes[index]["estadoIdSelecionado_infracao"],
           items: estados.map((estado) {
@@ -2459,14 +2691,16 @@ void exibirPopupTermosApreensao(BuildContext context, int qtdTermos , qtdTermosI
         ),
         SizedBox(height: 10),
 
-        Text('Cidade:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Cidade:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         TextField(
           controller: infracoes[index]["cidade_infracao"],
           decoration: InputDecoration(labelText: "Cidade"),
         ),
         SizedBox(height: 10),
 
-        Text('Produtos:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Produtos:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         ListView.builder(
           shrinkWrap: true,
           itemCount: (infracoes[index]["produtos_infracao"] ?? []).length,
@@ -2485,7 +2719,8 @@ void exibirPopupTermosApreensao(BuildContext context, int qtdTermos , qtdTermosI
                     setState(() {
                       if (infracoes[index]["produtos_infracao"] != null &&
                           infracoes[index]["produtos_infracao"].isNotEmpty) {
-                        infracoes[index]["produtos_infracao"].removeAt(prodIndex);
+                        infracoes[index]["produtos_infracao"].removeAt(
+                            prodIndex);
                       }
                     });
                   },
@@ -2514,18 +2749,21 @@ void exibirPopupTermosApreensao(BuildContext context, int qtdTermos , qtdTermosI
       ],
     );
   }
+
   Widget construirFormularioApreensao(int index, StateSetter setState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Data e Hora:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Data e Hora:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         TextField(
           controller: apreensoes[index]["data_hora"],
           decoration: InputDecoration(labelText: "Data e Hora"),
         ),
         SizedBox(height: 10),
 
-        Text('Estado:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Estado:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         DropdownButton<int>(
           value: apreensoes[index]["estadoIdSelecionado"],
           items: estados.map((estado) {
@@ -2542,14 +2780,16 @@ void exibirPopupTermosApreensao(BuildContext context, int qtdTermos , qtdTermosI
         ),
         SizedBox(height: 10),
 
-        Text('Cidade:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Cidade:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         TextField(
           controller: apreensoes[index]["cidade"],
           decoration: InputDecoration(labelText: "Cidade"),
         ),
         SizedBox(height: 10),
 
-        Text('Produtos:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Produtos:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         ListView.builder(
           shrinkWrap: true,
           itemCount: apreensoes[index]["produtos"].length,
